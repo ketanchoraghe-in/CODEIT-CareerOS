@@ -1,0 +1,66 @@
+package com.codeit.careeros.controller;
+
+import com.codeit.careeros.common.ApiResponse;
+import com.codeit.careeros.dto.auth.AuthResponse;
+import com.codeit.careeros.dto.auth.LoginRequest;
+import com.codeit.careeros.dto.auth.RefreshRequest;
+import com.codeit.careeros.dto.auth.RegisterRequest;
+import com.codeit.careeros.dto.auth.UserResponse;
+import com.codeit.careeros.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@Tag(name = "Authentication", description = "Register, login, refresh and logout endpoints")
+@RestController
+@RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
+public class AuthController {
+
+    private final AuthService authService;
+
+    @Operation(summary = "Register a new student account")
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return ApiResponse.success("Registration successful", authService.register(request));
+    }
+
+    @Operation(summary = "Login with email and password")
+    @PostMapping("/login")
+    public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ApiResponse.success("Login successful", authService.login(request));
+    }
+
+    @Operation(summary = "Refresh access token using a refresh token")
+    @PostMapping("/refresh")
+    public ApiResponse<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return ApiResponse.success("Token refreshed", authService.refresh(request));
+    }
+
+    @Operation(summary = "Logout and revoke the refresh token")
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(@RequestBody(required = false) RefreshRequest request) {
+        if (request != null && request.refreshToken() != null) {
+            authService.logout(request.refreshToken());
+        }
+        // An Authorization Bearer access token alone cannot revoke a session
+        // (sessions are keyed by refresh-token hash), so without a refresh
+        // token logout is a successful no-op. The frontend always sends it.
+        return ApiResponse.success("Logged out successfully", null);
+    }
+
+    @Operation(summary = "Get the currently authenticated user")
+    @GetMapping("/me")
+    public ApiResponse<UserResponse> me() {
+        return ApiResponse.success(authService.me());
+    }
+}

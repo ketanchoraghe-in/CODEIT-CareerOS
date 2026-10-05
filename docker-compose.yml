@@ -1,0 +1,53 @@
+# Sprint 8 development stack: local MySQL + Spring Boot API (dev profile) + Next.js.
+# No secrets here — dev-only defaults with the weakest possible privileges.
+# Production MUST use docker-compose.prod.yml with backend.env instead.
+#
+#   docker compose -f docker-compose.yml up --build
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_dev_pw
+      MYSQL_DATABASE: careeros
+      MYSQL_USER: careeros
+      MYSQL_PASSWORD: careeros_dev_pw
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-dev-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_dev_pw"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./careeros-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:mysql://mysql:3306/careeros?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectionTimeZone=UTC
+      DB_USERNAME: careeros
+      DB_PASSWORD: careeros_dev_pw
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./careeros-frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  mysql-dev-data:

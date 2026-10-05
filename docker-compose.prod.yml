@@ -1,0 +1,52 @@
+# Sprint 8 production stack: MySQL + Spring Boot API + Next.js frontend.
+# Secrets are NEVER hardcoded here — every sensitive value comes from the
+# environment files referenced below. Copy .env.example to the real files
+# and fill them in on the deployment host (never commit the real ones).
+#
+#   cp .env.example backend.env
+#   cp careeros-frontend/.env.example frontend.env   # only NEXT_PUBLIC_API_URL
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    env_file:
+      - ./backend.env
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-careeros}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./careeros-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend.env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/${DB_NAME:-careeros}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectionTimeZone=UTC
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./careeros-frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-http://localhost:8080}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:
