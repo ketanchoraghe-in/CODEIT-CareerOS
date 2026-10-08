@@ -7,6 +7,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Circle,
+  ClipboardList,
   Clock3,
   List,
   Loader2,
@@ -16,10 +17,13 @@ import {
   Route,
   Sparkles,
   Target,
+  TrendingUp,
+  Trophy,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CircularProgress } from "@/components/ui/circular-progress";
 import { Progress } from "@/components/ui/progress";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { EmptyState } from "@/components/empty-state";
@@ -252,6 +256,18 @@ export default function StudentRoadmapPage() {
     statusById[item.itemId] = item.status;
   });
 
+  // Journey state: which phase the student is standing in right now.
+  const phaseDoneFlags = phases.map((phase) => {
+    const total = phase.totalItems ?? (phase.items || []).length;
+    const done = phase.completedItems ?? (phase.items || []).filter((i) => i.status === "COMPLETED").length;
+    return { done, total, complete: total > 0 && done >= total };
+  });
+  const currentPhaseIndex = (() => {
+    const idx = phaseDoneFlags.findIndex((p) => !p.complete);
+    return idx === -1 ? phases.length - 1 : idx;
+  })();
+  const journeyPercent = roadmap.progressPercent ?? 0;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -262,56 +278,155 @@ export default function StudentRoadmapPage() {
 
       {/* How this works — one glance, plain words */}
       <Card className="shadow-card">
-        <CardContent className="grid gap-3 py-5 sm:grid-cols-3">
-          {[
-            { n: "1", title: "Take the assessment", text: `We measure your skills against what a ${careerName} needs.` },
-            { n: "2", title: "Follow the steps", text: "Each step targets your biggest gap first. Start at the top." },
-            { n: "3", title: "Watch yourself grow", text: "Retake assessments — your readiness score climbs as you finish steps." },
-          ].map((step) => (
-            <div key={step.n} className="flex items-start gap-3">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                {step.n}
-              </span>
-              <div>
-                <p className="text-sm font-semibold">{step.title}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{step.text}</p>
+        <CardContent className="py-5">
+          <div className="relative grid gap-5 sm:grid-cols-3 sm:gap-3">
+            <div aria-hidden="true" className="absolute left-[13%] right-[13%] top-5 hidden border-t-2 border-dashed border-primary/25 sm:block" />
+            {[
+              { n: "1", icon: ClipboardList, title: "Take the assessment", text: `We measure your skills against what a ${careerName} needs.` },
+              { n: "2", icon: Route, title: "Follow the steps", text: "Each step targets your biggest gap first. Start at the top." },
+              { n: "3", icon: TrendingUp, title: "Watch yourself grow", text: "Retake assessments — your readiness score climbs as you finish steps." },
+            ].map((step) => (
+              <div key={step.n} className="relative flex items-start gap-3">
+                <span className="relative z-10 flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-sm">
+                  <step.icon className="size-4.5" aria-hidden="true" />
+                  <span className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-card text-[10px] font-extrabold text-primary ring-1 ring-primary/30">
+                    {step.n}
+                  </span>
+                </span>
+                <div>
+                  <p className="text-sm font-bold">{step.title}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{step.text}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Overall journey */}
-      <Card className="border-primary/25 shadow-card">
-        <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-3 py-5">
-          <div className="min-w-52 flex-1">
-            <div className="mb-1.5 flex items-center justify-between gap-2 text-sm">
-              <span className="font-semibold">
-                {allDone
-                  ? `You finished the ${careerName} roadmap!`
-                  : `Your journey to ${careerName}`}
-              </span>
-              <span className="tnum text-xs font-semibold text-muted-foreground">
-                {completedItems} of {totalItems} steps · {roadmap.progressPercent ?? 0}%
-              </span>
+      {/* Journey hero — where you are, what's next, how far you've come */}
+      <Card className={cn("relative overflow-hidden shadow-card", allDone ? "border-chart-3/40" : "border-primary/25")}>
+        {/* decorative backdrop: gradient wash + dot grid + route watermark */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className={cn("absolute inset-0", allDone ? "bg-gradient-to-br from-chart-3/[0.12] via-transparent to-transparent" : "bg-gradient-to-br from-primary/[0.12] via-transparent to-transparent")} />
+          <div
+            className="absolute inset-0 opacity-[0.5]"
+            style={{ backgroundImage: "radial-gradient(var(--color-primary) 1px, transparent 1px)", backgroundSize: "22px 22px", WebkitMaskImage: "linear-gradient(115deg, black 0%, transparent 55%)", maskImage: "linear-gradient(115deg, black 0%, transparent 55%)", opacity: 0.12 }}
+          />
+          <Route className="absolute -right-6 -bottom-8 size-44 rotate-[-12deg] text-primary/[0.07]" aria-hidden="true" />
+        </div>
+        <CardContent className="relative py-6">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center">
+            <div className="min-w-0 flex-1">
+              <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+                <MapIcon className="size-3.5" aria-hidden="true" />
+                {allDone ? "Journey complete" : `Your 90-day journey · Phase ${phases.length > 0 ? currentPhaseIndex + 1 : "–"} of ${phases.length}`}
+              </p>
+              <h2 className="mt-1.5 text-xl font-extrabold tracking-tight sm:text-2xl">
+                {allDone ? (
+                  <>You finished the {careerName} roadmap!</>
+                ) : (
+                  <>Your journey to {careerName}</>
+                )}
+              </h2>
+              <p className="mt-1 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                {allDone ? (
+                  <>Every step complete — retake the assessment to prove your new level.</>
+                ) : nextStep ? (
+                  <><strong className="text-foreground">Right now:</strong> {nextStep.status === "IN_PROGRESS" ? "finish" : "start"} <strong className="text-foreground">“{nextStep.title}”</strong> from {nextStep.phaseTitle} — then keep walking the path below in order.</>
+                ) : (
+                  <>Follow the numbered path below, top to bottom — that order targets your biggest gaps first.</>
+                )}
+              </p>
+              <div className="mt-4">
+                <div className="mb-1.5 flex items-center justify-between gap-2 text-sm">
+                  <span className="tnum text-xs font-semibold text-muted-foreground">
+                    {completedItems} of {totalItems} steps
+                  </span>
+                  <span className="tnum text-sm font-extrabold text-primary">{journeyPercent}%</span>
+                </div>
+                <div className="relative">
+                  <Progress
+                    value={journeyPercent}
+                    tone={allDone ? "green" : "primary"}
+                    className="h-3"
+                    aria-label={`Roadmap progress ${journeyPercent} percent`}
+                  />
+                  {!allDone && (
+                    <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+                      <span className="absolute inset-y-0 w-16 animate-roadmap-shine bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span><strong className="tnum text-foreground">{roadmap.inProgressItems ?? 0}</strong> in progress</span>
+                  <span><strong className="tnum text-foreground">{remaining}</strong> to go</span>
+                  {nextStep && !allDone && (
+                    <span className="inline-flex items-center gap-1"><Clock3 className="size-3.5" aria-hidden="true" /> next step ~{nextStep.estimatedHours}h</span>
+                  )}
+                </div>
+              </div>
             </div>
-            <Progress
-              value={roadmap.progressPercent ?? 0}
-              tone={allDone ? "green" : "primary"}
-              className="h-2.5"
-              aria-label={`Roadmap progress ${roadmap.progressPercent ?? 0} percent`}
-            />
+            <div className="flex shrink-0 flex-col items-center gap-3">
+              <div className="relative">
+                <CircularProgress
+                  value={journeyPercent}
+                  size={132}
+                  strokeWidth={12}
+                  tone={allDone ? "green" : "primary"}
+                  label={`Roadmap ${journeyPercent} percent complete`}
+                >
+                  {allDone ? (
+                    <Trophy className="size-8 text-chart-3" aria-hidden="true" />
+                  ) : (
+                    <>
+                      <span className="tnum text-3xl font-extrabold tracking-tight text-primary">{journeyPercent}<span className="text-base">%</span></span>
+                      <span className="text-[11px] font-medium text-muted-foreground">journey</span>
+                    </>
+                  )}
+                </CircularProgress>
+                {allDone && (
+                  <span className="absolute -right-1 -top-1 flex size-7 items-center justify-center rounded-full bg-chart-3 text-white shadow-md">
+                    <CheckCircle2 className="size-4" aria-hidden="true" />
+                  </span>
+                )}
+              </div>
+              {/* phase journey dots */}
+              {phases.length > 0 && (
+                <div className="w-full max-w-52">
+                  <div className="flex items-center" aria-hidden="true">
+                    {phases.map((phase, i) => {
+                      const state = phaseDoneFlags[i];
+                      const isCurrent = i === currentPhaseIndex && !allDone;
+                      return (
+                        <span key={phase.phaseId} className="flex flex-1 items-center last:flex-none">
+                          <span
+                            title={`${phase.title}: ${state.done}/${state.total} steps`}
+                            className={cn(
+                              "relative flex size-4 items-center justify-center rounded-full border-2 transition",
+                              state.complete
+                                ? "border-chart-3 bg-chart-3"
+                                : isCurrent
+                                  ? "border-primary bg-primary"
+                                  : "border-border bg-card",
+                            )}
+                          >
+                            {state.complete && <CheckCircle2 className="size-2.5 text-white" />}
+                            {isCurrent && <span className="absolute size-4 animate-ping rounded-full bg-primary opacity-40" />}
+                          </span>
+                          {i < phases.length - 1 && (
+                            <span className={cn("h-0.5 flex-1 rounded-full", phaseDoneFlags[i].complete ? "bg-chart-3" : "bg-border")} />
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 truncate text-center text-[11px] font-semibold text-muted-foreground" title={phases[currentPhaseIndex]?.title}>
+                    {allDone ? "All phases complete" : `Now: ${phases[currentPhaseIndex]?.title}`}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {allDone ? (
-              <>Every step complete — time to retake the assessment and prove it.</>
-            ) : (
-              <>
-                <strong className="tnum text-foreground">{roadmap.inProgressItems ?? 0}</strong> in progress ·{" "}
-                <strong className="tnum text-foreground">{remaining}</strong> to go
-              </>
-            )}
-          </p>
         </CardContent>
       </Card>
 
@@ -456,17 +571,44 @@ export default function StudentRoadmapPage() {
             const phaseComplete = phaseTotal > 0 && phaseDone >= phaseTotal;
             return (
               <li key={phase.phaseId}>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant="secondary"
-                    className={cn("text-xs", phaseComplete && "bg-chart-3/15 text-chart-3")}
+                <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-card">
+                  <span
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-xl text-sm font-extrabold shadow-sm",
+                      phaseComplete ? "bg-chart-3 text-white" : phaseIndex === currentPhaseIndex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                    )}
                   >
+                    {phaseComplete ? <CheckCircle2 className="size-4.5" aria-hidden="true" /> : phaseIndex + 1}
+                  </span>
+                  <div className="min-w-44 flex-1">
+                    <p className="flex flex-wrap items-center gap-2 text-sm font-bold">
+                      {phase.title}
+                      {phaseIndex === currentPhaseIndex && !phaseComplete && (
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                          You are here
+                        </span>
+                      )}
+                      {phaseComplete && (
+                        <span className="rounded-full bg-chart-3/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-chart-3">
+                          Complete
+                        </span>
+                      )}
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-muted/80 sm:max-w-56">
+                        <div
+                          className={cn("h-full rounded-full transition-[width] duration-500", phaseComplete ? "bg-chart-3" : "bg-primary")}
+                          style={{ width: `${phaseTotal > 0 ? Math.round((phaseDone / phaseTotal) * 100) : 0}%` }}
+                        />
+                      </div>
+                      <p className="tnum shrink-0 text-[11px] font-semibold text-muted-foreground">
+                        {phaseComplete ? "complete" : `${phaseDone}/${phaseTotal} steps`} · ~{phase.durationDays}d
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="shrink-0 text-xs">
                     Phase {phaseIndex + 1} of {phases.length}
                   </Badge>
-                  <p className="text-sm font-bold">{phase.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {phaseComplete ? "complete" : `${phaseDone}/${phaseTotal} steps done`} · about {phase.durationDays} days
-                  </p>
                 </div>
                 <ol className="space-y-0">
                   {(phase.items || []).map((item) => {
@@ -511,10 +653,17 @@ export default function StudentRoadmapPage() {
                         </div>
                         <div
                           className={cn(
-                            "mb-1 flex-1 rounded-2xl border bg-card p-4 shadow-card transition sm:p-5",
-                            isNext ? "border-primary/50 ring-1 ring-primary/30" : "border-border/60",
+                            "relative mb-1 flex-1 overflow-hidden rounded-2xl border bg-card p-4 shadow-card transition sm:p-5",
+                            isNext
+                              ? "border-primary/50 bg-gradient-to-br from-primary/[0.07] via-card to-card ring-1 ring-primary/30"
+                              : done
+                                ? "border-chart-3/30 bg-chart-3/[0.04]"
+                                : "border-border/60",
                           )}
                         >
+                          {isNext && !done && (
+                            <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-primary via-primary/70 to-primary/30" />
+                          )}
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                               Step {stepNumber} of {totalItems}
@@ -548,6 +697,25 @@ export default function StudentRoadmapPage() {
                               ~{item.estimatedHours}h
                             </span>
                           </div>
+                          {item.skillName && item.assessed && item.targetPercent > 0 && (
+                            <div className="mt-2" role="img" aria-label={`${item.skillName}: you ${item.scorePercent}% of target ${item.targetPercent}%`}>
+                              <div className="relative h-1.5 overflow-visible rounded-full bg-muted/80">
+                                <div
+                                  className={cn("h-full rounded-full transition-[width] duration-500", done ? "bg-chart-3" : "bg-primary")}
+                                  style={{ width: `${Math.max(0, Math.min(100, Math.round((item.scorePercent / item.targetPercent) * 100)))}%` }}
+                                />
+                                <span
+                                  aria-hidden="true"
+                                  title={`Target ${item.targetPercent}%`}
+                                  className="absolute top-1/2 h-3 w-1 -translate-y-1/2 rounded-full bg-amber-500 shadow-sm"
+                                  style={{ left: "calc(100% - 2px)" }}
+                                />
+                              </div>
+                              <p className="mt-1 text-[11px] font-medium text-muted-foreground">
+                                {done || (item.gapPercent ?? 0) >= 0 ? "Target reached — keep it sharp." : `${-(item.gapPercent ?? 0)} points to close with this step.`}
+                              </p>
+                            </div>
+                          )}
                           <div className="mt-3 flex flex-wrap gap-2">
                             <StepActions item={item} busy={busy} onChange={setStatus} />
                           </div>

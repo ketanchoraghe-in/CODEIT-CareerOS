@@ -104,34 +104,192 @@ public class CvAnalysisService {
     }
 
     /**
-     * Matches a master skill name against normalized CV text: either the
-     * full normalized name occurs, or every significant token of the name
-     * occurs as a whole word (covers "CI/CD (Jenkins)" vs "Jenkins").
+     * Matches a master skill name against normalized CV text. Real CVs write
+     * the same skill many ways ("HTML5, CSS3", "HTML / CSS", "SpringBoot",
+     * "NodeJS", "REST API", "Jenkins" for "CI/CD (Jenkins)", "Git" for
+     * "Git & GitHub"), so matching is deliberately recall-friendly — but
+     * always on whole-word boundaries, so "JavaScript" never implies "Java",
+     * "interaction" never implies "React" and "laws" never implies "AWS".
+     *
+     * <p>A skill matches when ANY of these holds:
+     * <ol>
+     *   <li>The full normalized name occurs as a whole word/phrase.</li>
+     *   <li>The glued form occurs ("SpringBoot", "ReactNative", "NodeJS").</li>
+     *   <li>A known abbreviation/variant occurs ("HTML5" via "html",
+     *       "MySQL" for "SQL", "K8s", "NLP", ...).</li>
+     *   <li>For names with {@code &}, {@code /} or parentheses, ANY
+     *       alternative part matches ("Git" alone matches "Git & GitHub",
+     *       "Jenkins" alone matches "CI/CD (Jenkins)").</li>
+     *   <li>Otherwise every significant token matches, or one long
+     *       distinctive token does ("Selenium" alone matches
+     *       "Selenium WebDriver"). Generic qualifiers ("Administration",
+     *       "Fundamentals", "Testing", "Design", ...) never match alone.</li>
+     * </ol>
      */
     static boolean mentions(String normalizedText, String skillName) {
+        if (skillName == null) {
+            return false;
+        }
         String normalizedSkill = normalize(skillName);
         if (normalizedSkill.isEmpty()) {
             return false;
         }
-        if (normalizedText.contains(normalizedSkill)) {
+        // 1. Full name as a whole word/phrase.
+        if (containsWord(normalizedText, normalizedSkill)) {
             return true;
         }
-        String[] tokens = normalizedSkill.split(" ");
-        int significant = 0;
-        for (String token : tokens) {
-            if (token.length() < 2) {
-                continue;
-            }
-            significant++;
-            if (!Pattern.compile("\\b" + Pattern.quote(token) + "\\b").matcher(normalizedText).find()) {
-                return false;
+        // 2. Glued form covers "SpringBoot", "ReactNative", "PowerBI", "NodeJS".
+        String compactSkill = normalizedSkill.replaceAll("[^a-z0-9]+", "");
+        if (compactSkill.length() >= 6
+                && normalizedText.replaceAll("[^a-z0-9]+", "").contains(compactSkill)) {
+            return true;
+        }
+        // 3. Known abbreviations / variants ("MySQL" for "SQL", "K8s", "NLP" ...).
+        for (String alias : aliasesFor(normalizedSkill)) {
+            if (!alias.isEmpty() && containsWord(normalizedText, alias)) {
+                return true;
             }
         }
-        return significant > 0;
+        // 4. Alternative parts ("HTML" or "CSS" for "HTML/CSS", "Git" for
+        // "Git & GitHub", "Jenkins" for "CI/CD (Jenkins)").
+        List<String> segments = segmentsOf(skillName);
+        if (segments.size() > 1) {
+            for (String segment : segments) {
+                if (segmentMatches(normalizedText, segment)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        // 5. Plain multi-word name: every significant token, or one long
+        // distinctive token ("Selenium" for "Selenium WebDriver").
+        return segmentMatches(normalizedText, normalizedSkill);
+    }
+
+    /**
+     * Tokens so generic they only count inside the full phrase ("cloud" alone
+     * must not match "Cloud Security" from "Cloud Practitioner course").
+     */
+    private static final java.util.Set<String> NEEDS_PHRASE = java.util.Set.of("cloud", "database");
+
+    /** A segment matches when every significant token is present, or one long distinctive token is. */
+    private static boolean segmentMatches(String normalizedText, String normalizedSegment) {
+        List<String> tokens = new ArrayList<>();
+        for (String token : normalizedSegment.split("[. ]+")) {
+            if (token.length() >= 2 && !STOPWORDS.contains(token)) {
+                tokens.add(token);
+            }
+        }
+        if (tokens.isEmpty()) {
+            return false;
+        }
+        if (tokens.size() == 1 && NEEDS_PHRASE.contains(tokens.get(0))) {
+            return containsWord(normalizedText, normalizedSegment);
+        }
+        boolean allPresent = true;
+        for (String token : tokens) {
+            if (containsWord(normalizedText, token)) {
+                if (token.length() >= 8) {
+                    return true;
+                }
+            } else {
+                allPresent = false;
+            }
+        }
+        return allPresent;
+    }
+
+    /**
+     * Splits a raw skill name into alternative parts: parenthesized groups
+     * become their own alternatives ("CI/CD (Jenkins)" → Jenkins, CI, CD),
+     * then the remainder splits on {@code &} and {@code /} ("HTML/CSS" →
+     * HTML, CSS). Plain names yield a single segment.
+     */
+    private static List<String> segmentsOf(String skillName) {
+        List<String> segments = new ArrayList<>();
+        Matcher parens = Pattern.compile("\\(([^()]*)\\)").matcher(skillName);
+        StringBuffer rest = new StringBuffer();
+        while (parens.find()) {
+            for (String part : parens.group(1).split("[&/]+")) {
+                String normalized = normalize(part);
+                if (!normalized.isEmpty()) {
+                    segments.add(normalized);
+                }
+            }
+            parens.appendReplacement(rest, " ");
+        }
+        parens.appendTail(rest);
+        for (String part : rest.toString().split("[&/]+")) {
+            String normalized = normalize(part);
+            if (!normalized.isEmpty()) {
+                segments.add(normalized);
+            }
+        }
+        return segments;
+    }
+
+    /** Whole-word search that also works for symbols ("C++", "C#", "Node.js"). */
+    private static boolean containsWord(String haystack, String needle) {
+        return Pattern.compile("(^|[^a-z0-9+#.])" + Pattern.quote(needle) + "([^a-z0-9+#.]|$)")
+                .matcher(haystack).find();
+    }
+
+    /**
+     * Generic qualifiers that must never match a skill alone: "Linux" matches
+     * "Linux Administration", but "Administration", "Testing" or "Design"
+     * alone match nothing.
+     */
+    private static final java.util.Set<String> STOPWORDS = java.util.Set.of(
+            "administration", "administrator", "fundamentals", "fundamental",
+            "operations", "operation", "testing", "design", "designer",
+            "analysis", "analyst", "analytics", "engineering", "engineer",
+            "development", "developer", "management", "manager",
+            "language", "languages", "processing", "learning",
+            "system", "systems", "application", "applications",
+            "rest", "data", "power", "deep", "natural", "security");
+
+    /**
+     * Abbreviations and common variants per normalized skill name.
+     * Keys AND values use {@link #normalize} spacing (letter/digit pairs are
+     * split: "K8s" is "k 8 s", "J2EE" is "j 2 ee").
+     */
+    private static final Map<String, List<String>> SKILL_ALIASES = Map.ofEntries(
+            Map.entry("javascript", List.of("js", "es 6")),
+            Map.entry("typescript", List.of("ts")),
+            Map.entry("python", List.of("py")),
+            Map.entry("sql", List.of("mysql", "postgresql", "postgres", "sqlite", "pl sql", "t sql")),
+            Map.entry("react", List.of("reactjs", "react.js")),
+            Map.entry("node.js", List.of("nodejs", "node")),
+            Map.entry("machine learning", List.of("ml")),
+            Map.entry("deep learning", List.of("dl")),
+            Map.entry("natural language processing", List.of("nlp")),
+            Map.entry("generative ai", List.of("genai", "ai")),
+            Map.entry("kubernetes", List.of("k 8 s")),
+            Map.entry("mongodb", List.of("mongo")),
+            Map.entry("rest apis", List.of("rest api", "restful")),
+            Map.entry("microservices", List.of("microservice")),
+            Map.entry("java", List.of("core java", "j 2 ee")),
+            Map.entry("aws", List.of("amazon web services")),
+            Map.entry("ci cd jenkins", List.of("cicd")),
+            Map.entry("api testing", List.of("postman")),
+            Map.entry("penetration testing", List.of("pentest", "pen test")),
+            Map.entry("data visualization", List.of("tableau")),
+            Map.entry("database administration", List.of("database administrator")));
+
+    private static List<String> aliasesFor(String normalizedSkill) {
+        List<String> aliases = SKILL_ALIASES.get(normalizedSkill);
+        return aliases == null ? List.of() : aliases;
     }
 
     static String normalize(String value) {
-        return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9+#.]+", " ").strip();
+        if (value == null) {
+            return "";
+        }
+        // Split letter<->digit so versions never glue tokens: "HTML5" becomes
+        // "html 5", letting the "html" / "css" word matchers work.
+        String split = value.toLowerCase(Locale.ROOT)
+                .replaceAll("(?<=[a-z])(?=\\d)|(?<=\\d)(?=[a-z])", " ");
+        return split.replaceAll("[^a-z0-9+#.]+", " ").strip();
     }
 
     /**

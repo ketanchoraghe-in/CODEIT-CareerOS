@@ -171,7 +171,11 @@ public class CareerAssistantService {
         checkRateLimit(userId);
         if (!aiProperties.isConfigured()) {
             if (aiProperties.isOfflineFallbackEnabled()) {
-                return offlineReply(session.getId(), userId, text, false);
+                // No LLM available: personal CareerOS questions still get the
+                // grounded offline engine, but purely general questions get an
+                // honest "provider unavailable" message (never a hardcoded
+                // answer pretending to be the LLM).
+                return offlineReply(session.getId(), userId, text, true);
             }
             throw BusinessException.serviceUnavailable(aiProperties.isGemini()
                     ? "AI assistant is not configured. Set GEMINI_API_KEY (or AI_API_KEY) "
@@ -232,14 +236,17 @@ public class CareerAssistantService {
      * Always-respond path: runs the zero-key, zero-network guidance engine,
      * persists BOTH turns and returns a ChatGPT-style grounded reply.
      *
-     * @param providerFailure true when the configured LLM was reachable but
-     *                        failed (as opposed to never configured). In that
-     *                        case purely general-knowledge questions get an
-     *                        honest "provider unavailable" message instead of
-     *                        a hardcoded answer pretending to be the LLM, while
-     *                        CareerOS questions still use the offline engine.
+     * @param llmUnavailable true when no LLM answer is possible (never
+     *                       configured, or configured but failed/timed out).
+     *                       In that case general-knowledge questions WITH a
+     *                       curated offline answer (see
+     *                       {@link OfflineGuidanceEngine#hasCuratedGeneralAnswer})
+     *                       are answered directly, while general questions
+     *                       WITHOUT one get an honest "provider unavailable"
+     *                       message instead of a generic template, and CareerOS
+     *                       questions still use the offline engine.
      */
-    private ChatReplyResponse offlineReply(Long sessionId, Long userId, String text, boolean providerFailure) {
+    private ChatReplyResponse offlineReply(Long sessionId, Long userId, String text, boolean llmUnavailable) {
         List<AiChatMessage> history = List.of();
         try {
             history = store.loadHistory(sessionId, userId, aiProperties.getHistoryLimit());
@@ -249,7 +256,25 @@ public class CareerAssistantService {
                 .map(AiChatMessage::getContent)
                 .filter(content -> content != null && !content.isBlank())
                 .toList();
-        if (providerFailure && offlineEngine.isGeneralKnowledgeOnly(text)) {
+        if (llmUnavailable && offlineEngine.isGeneralKnowledgeOnly(text)) {
+            // Curated offline answers (Java, Spring Boot, Python, SQL,
+            // JavaScript explainers, interview sets, code examples...) work
+            // with zero key — answer directly instead of the dead-end message.
+            if (offlineEngine.hasCuratedGeneralAnswer(text)) {
+                try {
+                    OfflineGuidanceEngine.GuidanceResult curated =
+                            offlineEngine.reply(text, historyTexts);
+                    if (curated != null && curated.reply() != null && !curated.reply().isBlank()) {
+                        store.saveMessage(sessionId, userId, ChatRole.USER, text);
+                        store.saveMessage(sessionId, userId, ChatRole.ASSISTANT, curated.reply());
+                        store.touchSession(sessionId, userId, text);
+                        return new ChatReplyResponse(
+                                sessionId, curated.reply(), List.copyOf(curated.toolsUsed()), true, "offline-smart");
+                    }
+                } catch (Exception ex) {
+                    log.warn("Curated offline answer failed: {}", ex.getClass().getSimpleName());
+                }
+            }
             String reply = "I'm having trouble reaching the AI provider right now, so I can't "
                     + "generate a fresh answer for that general question.\n\n"
                     + "Please try again in a moment — your conversation is saved. In the meantime "

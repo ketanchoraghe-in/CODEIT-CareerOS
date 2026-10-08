@@ -63,7 +63,7 @@ public class OfflineGuidanceEngine {
             toolsUsed.add("getStudentProfile");
             return new GuidanceResult(greetingReply(name), List.copyOf(toolsUsed));
         }
-        if (isHelp(lower)) {
+        if (isHelp(lower) && !isGeneralQuestion(lower)) {
             toolsUsed.add("getStudentProfile");
             return new GuidanceResult(helpReply(safeFirstName()), List.copyOf(toolsUsed));
         }
@@ -82,9 +82,12 @@ public class OfflineGuidanceEngine {
 
         // ROLE-SKILLS questions ("Which skills are needed to become a Java
         // Developer?"): answer in TWO parts — general skills for that role,
-        // then a personal comparison against real CareerOS data. Explicitly
+        // then a personal comparison against real CareerOS data. An explicit
+        // personal ask ("... and which ones am I missing?") keeps the two-part
+        // shape whenever a concrete role or technology is named; purely
         // personal asks ("What are my skill gaps?") skip this and stay personal.
-        if (isCareerSkillsQuestion(effectiveLower) && !hasExplicitPersonalAsk(effectiveLower)) {
+        if (isCareerSkillsQuestion(effectiveLower)
+                && (!hasExplicitPersonalAsk(effectiveLower) || hasConcreteRoleOrTech(effectiveRaw, effectiveLower))) {
             Snapshot snap = snapshot(toolsUsed);
             return new GuidanceResult(careerSkillsReply(snap, effectiveRaw, effectiveLower), List.copyOf(toolsUsed));
         }
@@ -101,7 +104,9 @@ public class OfflineGuidanceEngine {
 
         // GENERAL student questions: answer directly from general knowledge,
         // NEVER forced into career/profile/gap analysis, NEVER fabricated data.
-        if (isGeneralQuestion(effectiveLower)) {
+        // A bare technology topic ("Java", "SQL") is general too — the word
+        // alone must never trigger a personal CareerOS digest.
+        if (isGeneralQuestion(effectiveLower) || isBareTechTopic(effectiveLower)) {
             Snapshot snap = null;
             // "Give me Java interview questions based on my weak skills" is
             // general content tailored by real gaps — needs data, still no fabrication.
@@ -264,6 +269,9 @@ public class OfflineGuidanceEngine {
         }
         return containsAny(lower,
                 "what is ", "what are ", "what does ", "define ", "explain ",
+                "how do i learn", "how to learn", "how can i learn", "how should i learn",
+                "where do i start", "where should i start", "getting started",
+                "best way to learn", "start learning",
                 "trending", "in demand", "worth learning", "interview question",
                 "write a", "write me", "program", "code ", "example code",
                 "tutorial", "difference between", " vs ", "how does ",
@@ -353,6 +361,9 @@ public class OfflineGuidanceEngine {
      */
     private String generalReply(String raw, String lower, Snapshot snap) {
         String topic = extractTopic(raw);
+        if (lower.contains("email")) {
+            return emailReply(topic, lower);
+        }
         if (lower.contains("interview question")) {
             return interviewQuestionsReply(topic, lower, snap);
         }
@@ -388,7 +399,57 @@ public class OfflineGuidanceEngine {
                     + "Ask a follow-up like **\"Why is it useful?\"** or "
                     + "**\"Explain Spring Boot and tell me how good I am at it\"** for your personal standing.";
         }
-        if (key.contains("java")) {
+        if (key.contains("javascript")) {
+            return "### 📜 JavaScript — explained\n\n"
+                    + "**JavaScript** is the programming language of the web — it runs in every "
+                    + "browser and, via **Node.js**, on servers too. (Not related to Java despite the name.)\n\n"
+                    + "- **Key traits:** dynamically typed, single-threaded with an event loop, "
+                    + "huge ecosystem (npm, React, Node.js).\n"
+                    + "- **Core syllabus:** `let/const`, functions + arrow functions, arrays/objects, "
+                    + "DOM manipulation, `fetch`/promises + `async/await`, ES6 modules.\n"
+                    + "- **Where it's used:** interactive websites, React frontends, Node.js backends.\n"
+                    + "- **Is it trending?** Yes — JavaScript + React is the default frontend stack "
+                    + "for fresher web roles in 2026.\n\n"
+                    + "### ✅ How to get good\n"
+                    + "1. Basics + DOM → 2. `fetch` + async/await → "
+                    + "3. One mini project (todo app, weather app) → 4. React basics.\n\n"
+                    + "Ask **\"Give me JavaScript interview questions\"** or "
+                    + "**\"Explain JavaScript and tell me how good I am at it\"** to link this to your CareerOS data.";
+        }
+        if (key.contains("python")) {
+            return "### 🐍 Python — explained\n\n"
+                    + "**Python** is a simple, readable, general-purpose language — the most popular "
+                    + "first language for data roles, scripting and backend APIs.\n\n"
+                    + "- **Key traits:** dynamically typed, indentation-based blocks, massive "
+                    + "library ecosystem (pandas, Django, requests).\n"
+                    + "- **Core syllabus:** data types + loops/functions, lists/dicts, OOP basics, "
+                    + "file handling, pip + virtual environments.\n"
+                    + "- **Where it's used:** data analysis, automation scripts, Django backends, AI/ML.\n"
+                    + "- **Is it trending?** Yes — Python + SQL is the standard entry combo for "
+                    + "data analyst roles in 2026.\n\n"
+                    + "### ✅ How to get good\n"
+                    + "1. Syntax + data structures → 2. Functions + OOP → "
+                    + "3. One automation script → 4. SQL alongside it → 5. Assessment + revise weak spots.\n\n"
+                    + "Ask **\"Give me Python interview questions\"** or "
+                    + "**\"Explain Python and tell me how good I am at Python\"** to link this to your CareerOS data.";
+        }
+        if (key.contains("sql") || key.contains("mysql")) {
+            return "### 🗄️ SQL — explained\n\n"
+                    + "**SQL** (Structured Query Language) is how you store, retrieve and analyse "
+                    + "data in relational databases like MySQL and PostgreSQL.\n\n"
+                    + "- **Core syllabus:** `SELECT` + `WHERE` → `ORDER BY`/`LIMIT` → `JOIN`s → "
+                    + "`GROUP BY` + `HAVING` → subqueries → `INSERT`/`UPDATE`/`DELETE`.\n"
+                    + "- **One example:** `SELECT skill, AVG(score) FROM results GROUP BY skill HAVING AVG(score) < 60;`\n"
+                    + "- **Where it's used:** backend APIs, data analyst queries, reports — nearly every role.\n"
+                    + "- **Is it trending?** Permanently in demand — SQL appears in most fresher "
+                    + "backend and data job postings in 2026.\n\n"
+                    + "### ✅ How to get good\n"
+                    + "1. `SELECT`/`WHERE` basics → 2. JOINs → "
+                    + "3. GROUP BY + HAVING → 4. Practice 10 queries on a sample database.\n\n"
+                    + "Ask **\"Give me SQL interview questions\"** or "
+                    + "**\"Explain SQL and tell me how good I am at SQL\"** to link this to your CareerOS data.";
+        }
+        if (key.contains("java") && !key.contains("script")) {
             return "### ☕ Java — explained\n\n"
                     + "**Java** is a general-purpose, object-oriented, platform-independent language "
                     + "(\"write once, run anywhere\" via the JVM). It powers enterprise backends, "
@@ -429,6 +490,8 @@ public class OfflineGuidanceEngine {
         String display = topic.isBlank() ? "It" : topic;
         StringBuilder sb = new StringBuilder();
         sb.append("### 📈 Is ").append(display).append(" trending?\n\n");
+        sb.append("_I don't have live internet access, so this is stable background "
+                + "knowledge — not real-time data. Skim a few current job postings to confirm._\n\n");
         if (javaLike) {
             sb.append("**Short answer: yes.** Java + Spring Boot is still one of the most "
                     + "in-demand backend stacks for fresher/entry-level roles in 2026.\n\n");
@@ -512,8 +575,53 @@ public class OfflineGuidanceEngine {
         return sb.toString();
     }
 
+    /**
+     * Minimal writing-task answer for the offline fallback (e.g.
+     * "Help me write a professional email."): a reusable structure plus a
+     * copy-paste example. The configured LLM handles free-form writing tasks
+     * with full quality; this only keeps the no-key chat useful.
+     */
+    private String emailReply(String topic, String lower) {
+        return "### ✉️ Writing a professional email\n\n"
+                + "Use this structure every time:\n\n"
+                + "1. **Subject:** specific + short (e.g. *Request for internship guidance — 3rd-year CSE*) \n"
+                + "2. **Greeting:** *Dear Dr. Sharma,* / *Hello Ms. Iyer,*\n"
+                + "3. **Who you are (1 line):** name, year/branch, college\n"
+                + "4. **Purpose (2–3 lines):** exactly what you are asking for and why\n"
+                + "5. **Close:** *Thank you for your time. — Your Name, phone number*\n\n"
+                + "### Example\n\n"
+                + "> Subject: Request for project guidance — 3rd-year CSE\n>\n"
+                + "> Dear Dr. Sharma,\n>\n"
+                + "> I am Aarav, a 3rd-year CSE student at ABC College. I am building "
+                + "a Spring Boot task-tracker API and would value 15 minutes of your "
+                + "guidance on structuring the REST layer.\n>\n"
+                + "> Would Thursday or Friday afternoon suit you? I can share my code beforehand.\n>\n"
+                + "> Thank you for your time.\n>\n"
+                + "> Aarav · +91-98XXXXXXXX\n\n"
+                + "- **Tone tips:** short sentences, no slang, one ask per email, proofread names.\n"
+                + "- Tell me the **recipient and purpose** and I will tailor the draft further.";
+    }
+
     private String codeReply(String topic, String lower) {
         String key = topic.toLowerCase(Locale.ROOT);
+        if (key.contains("revers") || lower.contains("revers")) {
+            return "### 💻 Reverse a string in Java\n\n"
+                    + "```java\npublic class ReverseString {\n"
+                    + "    static String reverse(String s) {\n"
+                    + "        StringBuilder sb = new StringBuilder();\n"
+                    + "        for (int i = s.length() - 1; i >= 0; i--) {\n"
+                    + "            sb.append(s.charAt(i));\n"
+                    + "        }\n"
+                    + "        return sb.toString();\n    }\n"
+                    + "    public static void main(String[] args) {\n"
+                    + "        System.out.println(reverse(\"career\")); // reerac\n"
+                    + "    }\n}\n```\n\n"
+                    + "- **How it works:** walk the string backwards and collect each "
+                    + "character (`StringBuilder` avoids creating a new `String` per step).\n"
+                    + "- **Complexity:** O(n) time, O(n) space.\n"
+                    + "- **One-liner alternative:** `new StringBuilder(s).reverse().toString()` — "
+                    + "know the loop version for interviews, use the one-liner in real code.";
+        }
         if (key.contains("fibonacci") || lower.contains("fibonacci")) {
             return "### 💻 Fibonacci in Java\n\n"
                     + "```java\npublic class Fibonacci {\n"
@@ -559,12 +667,54 @@ public class OfflineGuidanceEngine {
     // ------------------------------------------------- role-skills questions --
 
     /**
+     * True when the offline engine has a SPECIFIC built-in answer for a
+     * general-knowledge question (curated explainers, interview sets, code
+     * examples, email help, trend briefs) — so it can answer with zero key
+     * instead of the "provider unavailable" message. Unknown topics return
+     * false and keep the honest provider-unavailable reply.
+     */
+     public boolean hasCuratedGeneralAnswer(String message) {
+        String raw = message == null ? "" : message.strip();
+        String lower = raw.toLowerCase(Locale.ROOT);
+        if (lower.isBlank()) {
+            return false;
+        }
+        // generalReply() routes these to dedicated builders — always specific.
+        if (lower.contains("interview question")) {
+            return true;
+        }
+        if (containsAny(lower, "write a", "write me", "program", "code example",
+                "hello world", "fibonacci", "palindrome", "sorting", "example code")) {
+            return true;
+        }
+        if (lower.contains("email")) {
+            return true;
+        }
+        if (lower.contains("trending") || lower.contains("in demand")
+                || lower.contains("worth learning")) {
+            return true;
+        }
+        // explainReply() has curated explainers for these topics only.
+        String key = extractTopic(raw).toLowerCase(Locale.ROOT);
+        if (key.contains("spring boot") || key.contains("springboot") || key.equals("spring")) {
+            return true;
+        }
+        if (key.contains("javascript") || key.contains("python")
+                || key.contains("sql") || key.contains("mysql")) {
+            return true;
+        }
+        return key.contains("java") && !key.contains("script");
+    }
+
+    /**
      * True when the message is a purely general-knowledge question with no
      * personal CareerOS angle (no "my …", no mixed two-part ask, no role
      * skills that invite a personal comparison). Used by
      * {@link CareerAssistantService} so that, when the configured LLM fails,
-     * general questions get an honest "provider unavailable" message instead
-     * of a hardcoded answer pretending to be the LLM. Greetings, help asks
+     * general questions WITHOUT a curated offline answer get an honest
+     * "provider unavailable" message instead of a generic template, while
+     * questions WITH a curated answer ({@link #hasCuratedGeneralAnswer})
+     * are answered directly. Greetings, help asks
      * and pronoun follow-ups return false so they keep their offline answers.
      */
     public boolean isGeneralKnowledgeOnly(String message) {
@@ -580,7 +730,7 @@ public class OfflineGuidanceEngine {
         if (isMixedQuestion(lower) || isCareerSkillsQuestion(lower) || hasExplicitPersonalAsk(lower)) {
             return false;
         }
-        return isGeneralQuestion(lower);
+        return isGeneralQuestion(lower) || isBareTechTopic(lower);
     }
 
     /**
@@ -595,8 +745,78 @@ public class OfflineGuidanceEngine {
     }
 
     /**
+     * Technology tokens that count as a concrete topic. Shared by the
+     * bare-topic general rule and the role-skills personal-combination rule so
+     * a bare "Java"/"SQL" is answered generally while "Java development and
+     * which ones am I missing" still gets its personal comparison.
+     */
+    private static final List<String> TECH_TOPICS = List.of(
+            "java", "python", "javascript", "typescript", "react", "angular",
+            "node", "sql", "mysql", "mongodb", "spring", "hibernate", "docker",
+            "kubernetes", "oops", "oop", "dsa", "jvm", "jdk", "jre", "git",
+            "maven", "gradle", "microservice", "microservices", "rest", "api",
+            "jwt", "jpa", "kafka", "redis", "html", "css", "linux",
+            "inheritance", "polymorphism", "encapsulation", "abstraction",
+            "recursion", "algorithm", "algorithms", "collections",
+            "multithreading", "streams", "lambda", "solid", "testing",
+            "selenium", "jenkins", "aws", "azure", "figma", "flutter", "dart",
+            "kotlin", "swift", "devops", "cybersecurity", "machine learning");
+
+    /**
+     * A message that is just a technology topic ("Java", "What SQL",
+     * "Spring Boot?") with no personal angle. Personal markers ("my …",
+     * "am I …") always disqualify so "my Java score" stays personal.
+     */
+    private boolean isBareTechTopic(String lower) {
+        if (containsAny(lower,
+                "my ", " mine", "i am ", "i'm ", "am i ", "for me", "based on my",
+                "should i learn", "should i improve", "what should i")) {
+            return false;
+        }
+        String words = lower.replaceAll("[^a-z#+. ]", " ").replaceAll("\\s+", " ").strip();
+        if (words.isEmpty()) {
+            return false;
+        }
+        String[] tokens = words.split(" ");
+        if (tokens.length > 3) {
+            return false;
+        }
+        for (String token : tokens) {
+            if (TECH_TOPICS.contains(token)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * True when the message names a concrete role ("Java Developer") or a
+     * concrete technology ("Java development"), so a combined ask like
+     * "... and which ones am I missing?" keeps the two-part role-skills
+     * shape instead of collapsing to a personal-only answer.
+     */
+    private boolean hasConcreteRoleOrTech(String raw, String lower) {
+        if (extractRole(raw) != null) {
+            return true;
+        }
+        return containsAny(lower, TECH_TOPICS.toArray(new String[0]));
+    }
+
+    /** First concrete technology token in the message, capitalized. */
+    private String firstTechTopic(String lower) {
+        String words = " " + lower.replaceAll("[^a-z#+. ]", " ").replaceAll("\\s+", " ").strip() + " ";
+        for (String tech : TECH_TOPICS) {
+            if (words.contains(" " + tech + " ")) {
+                return capitalizeTopic(tech);
+            }
+        }
+        return null;
+    }
+
+    /**
      * "Which skills are needed to become a Java Developer?" — a general
-     * role-skills question, NOT an immediate personal gap question.
+     * role-skills question answered in two parts (general list + personal
+     * comparison), NOT an immediate personal-only gap question.
      */
     private boolean isCareerSkillsQuestion(String lower) {
         if (!lower.contains("skill")) {
@@ -608,7 +828,7 @@ public class OfflineGuidanceEngine {
                 "to learn", "takes to");
         boolean roleWord = containsAny(lower,
                 "become", "be a ", "be an ", "for a ", "for an ", "role",
-                "career", "job", "developer", "engineer", "analyst",
+                "career", "job", "developer", "develop", "engineer", "analyst",
                 "scientist", "devops", "tester", "designer", "admin");
         return needWord && roleWord;
     }
@@ -733,7 +953,8 @@ public class OfflineGuidanceEngine {
      */
     private String careerSkillsReply(Snapshot s, String raw, String lower) {
         String role = extractRole(raw);
-        String displayRole = role == null ? "that role" : role;
+        String tech = role == null ? firstTechTopic(lower) : null;
+        String displayRole = role != null ? role : (tech != null ? tech + " development" : "your target role");
         List<String> skills = roleSkills(role);
         StringBuilder sb = new StringBuilder();
         sb.append("### 🛠️ Skills needed to become ").append(displayRole).append("\n\n");
@@ -753,8 +974,7 @@ public class OfflineGuidanceEngine {
             return sb.toString();
         }
         if (role != null && s.targetCareer != null
-                && !s.targetCareer.equalsIgnoreCase(role)
-                && !role.equalsIgnoreCase("that role")) {
+                && !s.targetCareer.equalsIgnoreCase(role)) {
             sb.append("_Note: your current CareerOS target is **").append(s.targetCareer)
                     .append("**, so the comparison below is against that framework._\n\n");
         }

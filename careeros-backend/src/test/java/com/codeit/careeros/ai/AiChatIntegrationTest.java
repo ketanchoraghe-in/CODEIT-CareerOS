@@ -65,6 +65,11 @@ class AiChatIntegrationTest {
                 if (lastUser.contains("DROP TABLE")) {
                     return StubToolModels.toolCall("dropTables", "{}");
                 }
+                if (lastUser.equals("What is Java?")) {
+                    // General knowledge: the model answers directly, no tools.
+                    return StubToolModels.textAnswer(
+                            "Java is a high-level, object-oriented programming language.");
+                }
                 return StubToolModels.toolCall("getReadiness", "{}");
             });
             return stub;
@@ -180,6 +185,23 @@ class AiChatIntegrationTest {
                 .andExpect(jsonPath("$.data.toolsUsed[0]").value("getSkillGaps"))
                 .andExpect(jsonPath("$.data.toolsUsed[1]").value("getProjects"))
                 .andExpect(jsonPath("$.data.toolsUsed.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("General question is answered directly by the model with no tools")
+    void generalQuestion_noToolsCalled() throws Exception {
+        String token = registerStudent("ai8@test.local");
+        long sessionId = createSession(token);
+
+        mockMvc.perform(post("/api/v1/ai/chat/sessions/" + sessionId + "/messages")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"What is Java?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reply")
+                        .value("Java is a high-level, object-oriented programming language."))
+                .andExpect(jsonPath("$.data.toolsUsed.length()").value(0))
+                .andExpect(jsonPath("$.data.mode").value("llm"));
     }
 
     @Test

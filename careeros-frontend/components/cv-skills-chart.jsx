@@ -9,6 +9,15 @@ import { prettifyEnum } from "@/lib/format";
  * Professional per-skill circle chart.
  * Every skill gets its own slice + color. Hovering a slice or
  * legend row spotlights it and updates the center readout.
+ *
+ * Honesty rules (no fabricated numbers):
+ * - The ring is purely categorical: one slice per skill. Slice sizes never
+ *   pretend to be scores.
+ * - The big center number is the REAL coverage (alignment%) when a target
+ *   career exists, or the detected-skill count otherwise.
+ * - Legend rows show REAL per-skill facts only: tested score vs target,
+ *   "on CV but not tested", or "missing (W% of role)". Bars render only for
+ *   real tested scores.
  */
 
 /* Vivid but harmonious 12-tone professional palette */
@@ -34,7 +43,7 @@ function polar(cx, cy, r, angleDeg) {
   return [cx + r * Math.cos(rad), cy + r * Math.sin(rad)];
 }
 
-function SkillDonut({ skills = [], totalWeight = 1, size = 216, active, onActive }) {
+function SkillDonut({ skills = [], totalWeight = 1, size = 216, active, onActive, center }) {
   const cx = size / 2;
   const cy = size / 2;
   const outer = size / 2 - 10;
@@ -55,6 +64,8 @@ function SkillDonut({ skills = [], totalWeight = 1, size = 216, active, onActive
     });
   }, [skills, totalWeight, gapDeg]);
 
+  const activeSkill = active ? skills.find((s) => s.key === active) : null;
+
   return (
     <div className="relative inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
       {/* glow + soft shadow */}
@@ -72,6 +83,7 @@ function SkillDonut({ skills = [], totalWeight = 1, size = 216, active, onActive
           const dx = isActive ? (mx - cx) * 0.06 : 0;
           const dy = isActive ? (my - cy) * 0.06 : 0;
           const baseOpacity = skill.dimmed ? 0.4 : 1;
+          const tip = `${skill.name} · ${skill.centerLine}`;
           return (
             <g key={skill.key} transform={`translate(${dx} ${dy})`} style={{ transition: "transform .25s ease, opacity .25s ease" }} opacity={active && !isActive ? 0.3 : baseOpacity}>
               {isActive && (
@@ -98,9 +110,9 @@ function SkillDonut({ skills = [], totalWeight = 1, size = 216, active, onActive
                 onBlur={() => onActive?.(null)}
                 tabIndex={0}
                 role="img"
-                aria-label={`${skill.name}: ${skill.percent}%`}
+                aria-label={tip}
               >
-                <title>{`${skill.name} · ${skill.meta} · ${skill.percent}%`}</title>
+                <title>{tip}</title>
               </path>
             </g>
           );
@@ -108,13 +120,27 @@ function SkillDonut({ skills = [], totalWeight = 1, size = 216, active, onActive
       </svg>
       {/* center card */}
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
-        <span className="tnum max-w-full truncate text-xl font-extrabold leading-tight tracking-tight text-foreground">{active ? skills.find((s) => s.key === active)?.name : `${skills.length} skills`}</span>
-        <span className="tnum mt-1 text-[26px] font-extrabold leading-none" style={{ color: active ? skills.find((s) => s.key === active)?.color : "var(--color-primary)" }}>
-          {active ? `${skills.find((s) => s.key === active)?.percent}%` : "100%"}
-        </span>
-        <span className="mt-1.5 inline-flex max-w-full items-center gap-1 truncate rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-secondary-foreground">
-          {active ? skills.find((s) => s.key === active)?.meta : "even share · hover a slice"}
-        </span>
+        {activeSkill ? (
+          <>
+            <span className="tnum max-w-full truncate text-xl font-extrabold leading-tight tracking-tight text-foreground">{activeSkill.name}</span>
+            <span className="tnum mt-1 text-[26px] font-extrabold leading-none" style={{ color: activeSkill.valueColor || "var(--color-primary)" }}>
+              {activeSkill.valueText}
+            </span>
+            <span className="mt-1.5 inline-flex max-w-full items-center gap-1 truncate rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-secondary-foreground">
+              {activeSkill.centerLine}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="tnum max-w-full truncate text-xl font-extrabold leading-tight tracking-tight text-foreground">{center.title}</span>
+            <span className="tnum mt-1 text-[26px] font-extrabold leading-none" style={{ color: center.color || "var(--color-primary)" }}>
+              {center.value}
+            </span>
+            <span className="mt-1.5 inline-flex max-w-full items-center gap-1 truncate rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-secondary-foreground">
+              {center.caption}
+            </span>
+          </>
+        )}
       </div>
     </div>
   );
@@ -147,15 +173,19 @@ function SkillLegendRow({ skill, active, onActive }) {
             <CircleDashed className="size-3.5 shrink-0 text-amber-500" aria-label="Missing" />
           ) : null}
         </span>
-        <span className="tnum shrink-0 text-sm font-extrabold" style={{ color: skill.color }}>{skill.percent}%</span>
+        {skill.valueText && (
+          <span className="tnum shrink-0 text-sm font-extrabold" style={{ color: skill.valueColor || skill.color }}>{skill.valueText}</span>
+        )}
       </div>
       <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground">{skill.meta}</p>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/80">
-        <div
-          className="h-full rounded-full transition-[width] duration-500"
-          style={{ width: `${Math.max(skill.percent, 7)}%`, background: `linear-gradient(90deg, ${skill.color}CC, ${skill.color})` }}
-        />
-      </div>
+      {typeof skill.barPercent === "number" && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted/80" role="img" aria-label={`${skill.name} tested score ${skill.barPercent}%`}>
+          <div
+            className="h-full rounded-full transition-[width] duration-500"
+            style={{ width: `${Math.min(100, Math.max(skill.barPercent, 0))}%`, background: `linear-gradient(90deg, ${skill.color}CC, ${skill.color})` }}
+          />
+        </div>
+      )}
     </li>
   );
 }
@@ -164,25 +194,52 @@ export function CvSkillsChart({ detected = [], matched = [], missing = [], hasTa
   const [active, setActive] = useState(null);
 
   const skills = useMemo(() => {
-    // With target: every framework skill = own slice (matched solid, missing dimmed)
+    // With target: every framework skill = own slice (matched solid, missing dimmed).
+    // Values are REAL backend facts: tested score vs target, or role weight.
     if (Boolean(hasTarget) && matched.length + missing.length > 0) {
-      const all = [
-        ...matched.map((s) => ({ name: s.skillName, cat: s.skillCategory, status: "matched" })),
-        ...missing.map((s) => ({ name: s.skillName, cat: s.skillCategory, status: "missing" })),
-      ];
-      const total = all.length;
-      return all.map((s, i) => ({
-        key: `fw-${s.status}-${s.name}-${i}`,
-        name: s.name,
-        meta: s.cat ? `${prettifyEnum(s.cat)} · ${s.status}` : s.status,
-        status: s.status,
-        color: SKILL_PALETTE[i % SKILL_PALETTE.length],
-        dimmed: s.status === "missing",
-        weight: 1,
-        percent: total > 0 ? Math.round((100 / total) * 10) / 10 : 0,
-      }));
+      const out = [];
+      matched.forEach((s, i) => {
+        const assessed = Boolean(s.assessed) && typeof s.scorePercent === "number";
+        const score = assessed ? s.scorePercent : null;
+        const target = typeof s.targetPercent === "number" ? s.targetPercent : null;
+        out.push({
+          key: `fw-matched-${s.skillName}-${i}`,
+          name: s.skillName,
+          status: "matched",
+          color: SKILL_PALETTE[out.length % SKILL_PALETTE.length],
+          dimmed: false,
+          weight: 1,
+          meta: s.skillCategory
+            ? `${prettifyEnum(s.skillCategory)} · ${assessed ? `tested ${score}% · target ${target ?? "—"}%` : "on your CV · not tested yet"}`
+            : assessed ? `Tested ${score}% · target ${target ?? "—"}%` : "On your CV · not tested yet",
+          valueText: assessed ? `${score}%` : "On CV",
+          valueColor: undefined,
+          barPercent: assessed ? score : null,
+          centerLine: assessed ? `Tested ${score}% · target ${target ?? "—"}%` : "On your CV · not tested yet",
+        });
+      });
+      missing.forEach((s, i) => {
+        const weight = typeof s.weightPercent === "number" ? s.weightPercent : null;
+        out.push({
+          key: `fw-missing-${s.skillName}-${i}`,
+          name: s.skillName,
+          status: "missing",
+          color: SKILL_PALETTE[out.length % SKILL_PALETTE.length],
+          dimmed: true,
+          weight: 1,
+          meta: s.skillCategory
+            ? `${prettifyEnum(s.skillCategory)} · ${weight !== null ? `${weight}% of role` : "not on CV"}`
+            : weight !== null ? `${weight}% of role · not on CV` : "Not on your CV",
+          valueText: "Missing",
+          valueColor: "#d97706",
+          barPercent: null,
+          centerLine: weight !== null ? `Missing · ${weight}% of role` : "Missing from your CV",
+        });
+      });
+      return out;
     }
-    // No target: every detected skill = own slice, grouped order by category
+    // No target: every detected skill = own slice, grouped order by category.
+    // No scores exist here, so rows show identity only — never fake percents.
     const sorted = [...detected].sort((a, b) => String(a.skillCategory || "").localeCompare(String(b.skillCategory || "")));
     const total = sorted.length;
     const MAX_SLICES = 11;
@@ -191,12 +248,15 @@ export function CvSkillsChart({ detected = [], matched = [], missing = [], hasTa
     const out = head.map((s, i) => ({
       key: `det-${s.skillId ?? s.skillName}-${i}`,
       name: s.skillName,
-      meta: prettifyEnum(s.skillCategory),
+      meta: prettifyEnum(s.skillCategory) || "Detected on CV",
       status: "detected",
       color: SKILL_PALETTE[i % SKILL_PALETTE.length],
       dimmed: false,
       weight: 1,
-      percent: total > 0 ? Math.round((100 / total) * 10) / 10 : 0,
+      valueText: null,
+      valueColor: undefined,
+      barPercent: null,
+      centerLine: prettifyEnum(s.skillCategory) || "Detected on your CV",
     }));
     if (tail.length > 0) {
       out.push({
@@ -207,7 +267,10 @@ export function CvSkillsChart({ detected = [], matched = [], missing = [], hasTa
         color: OTHER_COLOR,
         dimmed: false,
         weight: tail.length,
-        percent: total > 0 ? Math.round(((tail.length / total) * 100) * 10) / 10 : 0,
+        valueText: null,
+        valueColor: undefined,
+        barPercent: null,
+        centerLine: `${tail.length} more detected skills`,
       });
     }
     return out;
@@ -222,11 +285,28 @@ export function CvSkillsChart({ detected = [], matched = [], missing = [], hasTa
   const totalWeight = ring.reduce((sum, s) => sum + (s.weight ?? 1), 0);
 
   const matchedCount = matched.length;
-  const hasCoverage = Boolean(hasTarget) && matchedCount + missing.length > 0;
+  const frameworkTotal = matchedCount + missing.length;
+  const hasCoverage = Boolean(hasTarget) && frameworkTotal > 0;
   const heading = hasCoverage ? "Skills coverage" : "Detected skills";
   const sub = hasCoverage
-    ? `${matchedCount} of ${matchedCount + missing.length}${careerName ? ` ${careerName}` : ""} skills on your CV · ${alignment}% aligned`
-    : `${detected.length} ${detected.length === 1 ? "skill" : "skills"} · each slice = one skill`;
+    ? `${matchedCount} of ${frameworkTotal}${careerName ? ` ${careerName}` : ""} skills on your CV · ${alignment}% aligned`
+    : `${detected.length} ${detected.length === 1 ? "skill" : "skills"} detected · one slice each`;
+  const center = hasCoverage
+    ? {
+        title: `${matchedCount} of ${frameworkTotal} skills`,
+        value: `${alignment}%`,
+        caption: careerName ? `of ${careerName} on your CV` : "of target role on your CV",
+        color: undefined,
+      }
+    : {
+        title: `${detected.length} ${detected.length === 1 ? "skill" : "skills"}`,
+        value: "CV",
+        caption: "detected on your CV",
+        color: undefined,
+      };
+  const caption = hasCoverage
+    ? "One slice per role skill · solid = on your CV · dimmed = missing"
+    : "One slice per detected skill";
 
   return (
     <div className={cn("overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-primary/[0.08] via-card to-card shadow-[0_2px_16px_rgb(0_0_0/0.05)]", className)}>
@@ -247,16 +327,16 @@ export function CvSkillsChart({ detected = [], matched = [], missing = [], hasTa
           </span>
         ) : (
           <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-xs font-bold text-secondary-foreground">
-            {skills.length} colors · {skills.length} skills
+            {detected.length} detected
           </span>
         )}
       </div>
       <div className="flex flex-col items-center gap-5 p-4 sm:p-5 xl:flex-row xl:items-center">
         <div className="flex shrink-0 flex-col items-center gap-2" onMouseLeave={() => setActive(null)}>
-          <SkillDonut skills={ring} totalWeight={totalWeight} size={216} active={active} onActive={setActive} />
+          <SkillDonut skills={ring} totalWeight={totalWeight} size={216} active={active} onActive={setActive} center={center} />
           <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
             <span aria-hidden="true" className="inline-block size-1.5 rounded-full bg-primary" />
-            CV skills percent · {ring.length} slices
+            {caption}
           </div>
         </div>
         <ul className={cn("grid w-full min-w-0 flex-1 gap-2", ring.length > 4 ? "sm:grid-cols-2" : "grid-cols-1")}>

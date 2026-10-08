@@ -35,13 +35,31 @@ class OfflineGeneralClassifierTest {
     @ValueSource(strings = {
             "What is Java?",
             "Explain Spring Boot.",
+            "What is Python?",
+            "What is React?",
+            "What is SQL?",
+            "What is polymorphism?",
+            "What is dependency injection?",
+            "Explain microservices.",
+            "Explain REST API.",
+            "How does JWT work?",
+            "What is the difference between Java and Python?",
+            "How do I learn Java?",
+            "Write a Java program for palindrome.",
             "Write a Java program to reverse a string.",
             "Explain recursion.",
             "What is REST API?",
             "Give me Java interview questions.",
             "Explain ArrayList vs LinkedList.",
             "Help me write a professional email.",
-            "What is trending in Java right now?"
+            "What is trending in Java right now?",
+            "Java",
+            "SQL",
+            "React",
+            "Python",
+            "Docker",
+            "Spring Boot",
+            "Polymorphism"
     })
     @DisplayName("Purely general questions are classified as general knowledge")
     void generalQuestions_classifiedGeneral(String message) {
@@ -56,7 +74,10 @@ class OfflineGeneralClassifierTest {
             "What should I learn next?",
             "Which projects should I build?",
             "Explain Spring Boot and tell me how good I am at it.",
+            "What skills are required to become a Java developer?",
             "What skills do I need to become a Java developer and which am I missing?",
+            "What skills do I need for Java development and which ones am I missing?",
+            "What is my Java score?",
             "hello",
             "Why is it useful?",
             "Is it difficult to learn?"

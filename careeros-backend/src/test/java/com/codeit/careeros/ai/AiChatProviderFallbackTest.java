@@ -93,7 +93,7 @@ class AiChatProviderFallbackTest {
     }
 
     @Test
-    @DisplayName("Provider failure on a general question is honest instead of a hardcoded answer")
+    @DisplayName("Provider failure on a curated general question still answers offline")
     void providerFailure_generalQuestionUnavailable() throws Exception {
         MvcResult registered = mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -125,6 +125,45 @@ class AiChatProviderFallbackTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.offline").value(true))
                 .andExpect(jsonPath("$.data.toolsUsed.length()").value(0))
+                .andReturn();
+
+        String reply = objectMapper.readTree(result.getResponse().getContentAsString())
+                .path("data").path("reply").asText();
+        org.assertj.core.api.Assertions.assertThat(reply).contains("Java — explained");
+    }
+
+    @Test
+    @DisplayName("Provider failure on an uncurated general question stays honest")
+    void providerFailure_uncuratedGeneralQuestionHonest() throws Exception {
+        MvcResult registered = mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fullName": "Honest Fallback Student",
+                                  "email": "fallback-honest@test.local",
+                                  "mobile": "9876543210",
+                                  "password": "Password1"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String token = TestSupport.token(registered, "accessToken");
+
+        MvcResult created = mockMvc.perform(post("/api/v1/ai/chat/sessions")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long sessionId = objectMapper.readTree(created.getResponse().getContentAsString())
+                .path("data").path("id").asLong();
+
+        MvcResult result = mockMvc.perform(post("/api/v1/ai/chat/sessions/" + sessionId + "/messages")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"What is the capital of France?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.offline").value(true))
                 .andReturn();
 
         String reply = objectMapper.readTree(result.getResponse().getContentAsString())

@@ -32,9 +32,16 @@ export default function StudentCareersPage() {
   const [detailSkills, setDetailSkills] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [skillCache, setSkillCache] = useState({});
   const [readiness, setReadiness] = useState(null);
 
   const [selectingId, setSelectingId] = useState(null);
+
+  // Client-side paging over the (already complete) published catalog so a
+  // large catalog stays scannable without hiding any career. The full
+  // filtered list is always reachable via "Show more" / "Show all".
+  const PAGE_SIZE = 12;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,14 +89,30 @@ export default function StudentCareersPage() {
     });
   }, [careers, search, categoryFilter]);
 
+  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+
+  function clearSearchAndFilters() {
+    setSearch("");
+    setCategoryFilter("ALL");
+    setVisibleCount(PAGE_SIZE);
+  }
+
   async function openDetail(career) {
     setDetailCareer(career);
-    setDetailSkills([]);
     setDetailError("");
+    const cached = skillCache[career.id];
+    if (cached) {
+      setDetailSkills(cached);
+      setDetailLoading(false);
+      return;
+    }
+    setDetailSkills([]);
     setDetailLoading(true);
     try {
       const skills = await api.get(`/careers/${career.id}/skills`);
-      setDetailSkills(Array.isArray(skills) ? skills : []);
+      const list = Array.isArray(skills) ? skills : [];
+      setDetailSkills(list);
+      setSkillCache((prev) => ({ ...prev, [career.id]: list }));
     } catch (err) {
       setDetailError(err?.message || "Failed to load required skills.");
     } finally {
@@ -98,6 +121,7 @@ export default function StudentCareersPage() {
   }
 
   async function selectCareer(careerId) {
+    if (selectingId !== null) return;
     setSelectingId(careerId);
     try {
       const updated = await api.put("/students/me/career", { careerId });
@@ -199,7 +223,10 @@ export default function StudentCareersPage() {
             <Input
               name="search"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setVisibleCount(PAGE_SIZE);
+              }}
               placeholder="Search careers…"
               className="h-10 pl-9"
               aria-label="Search careers"
@@ -209,7 +236,10 @@ export default function StudentCareersPage() {
             id="student-career-category-filter"
             aria-label="Filter by category"
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            onChange={(e) => {
+              setCategoryFilter(e.target.value);
+              setVisibleCount(PAGE_SIZE);
+            }}
             options={[
               { value: "ALL", label: "All categories" },
               ...categories.map((category) => ({
@@ -225,19 +255,28 @@ export default function StudentCareersPage() {
         </CardContent>
       </Card>
 
-      {filtered.length === 0 ? (
+      {careers.length === 0 ? (
         <EmptyState
           icon={Target}
-          title={careers.length === 0 ? "No published careers yet" : "No careers match your filters"}
-          description={
-            careers.length === 0
-              ? "Check back soon — an admin publishes careers here."
-              : "Try a different search term or category."
+          title="Career options are currently unavailable."
+          description="Check back soon — an admin publishes careers here."
+          action={<Button onClick={load}>Try again</Button>}
+        />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={Target}
+          title="No career found."
+          description="Try a different search term or category, or clear the search and filters to browse everything."
+          action={
+            <Button variant="outline" onClick={clearSearchAndFilters}>
+              Clear search & filters
+            </Button>
           }
         />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((career) => {
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {visible.map((career) => {
             const isCurrent = currentTargetId === career.id;
             const isSelecting = selectingId === career.id;
             return (
@@ -288,7 +327,23 @@ export default function StudentCareersPage() {
               </Card>
             );
           })}
-        </div>
+          </div>
+          {visibleCount < filtered.length && (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <p className="text-xs text-muted-foreground">
+                Showing {visible.length} of {filtered.length} careers
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}>
+                  Show more
+                </Button>
+                <Button variant="ghost" onClick={() => setVisibleCount(filtered.length)}>
+                  Show all
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <Dialog

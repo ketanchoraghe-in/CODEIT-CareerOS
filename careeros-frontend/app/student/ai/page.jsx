@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
+  ArrowRight,
   Bot,
   Brain,
   Check,
@@ -76,12 +77,6 @@ const SUGGESTION_CARDS = [
     desc: "Simple projects recruiters love",
     icon: FolderKanban,
   },
-];
-
-const HOW_IT_WORKS = [
-  { n: "1", title: "Ask in simple words", desc: "Just type like you talk. No special format." },
-  { n: "2", title: "I check your data", desc: "I read your profile, CV, tests & roadmap." },
-  { n: "3", title: "You get a clear plan", desc: "Small steps you can finish today." },
 ];
 
 const FOLLOW_UPS = [
@@ -183,15 +178,16 @@ function MarkdownAnswer({ content }) {
 function TypingIndicator() {
   return (
     <div className="flex gap-3" role="status" aria-live="polite" aria-label="Assistant is thinking">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-pine-800 text-white shadow-md shadow-brand-900/20">
+      <span className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-pine-800 text-white shadow-md shadow-brand-900/20">
         <Bot className="size-4" aria-hidden="true" />
+        <span className="absolute inset-0 animate-ping rounded-full bg-brand-500 opacity-20" aria-hidden="true" />
       </span>
-      <div className="rounded-2xl rounded-tl-md border border-border/60 bg-card px-4 py-3.5 shadow-sm">
+      <div className="rounded-2xl rounded-tl-md border border-primary/20 bg-gradient-to-br from-primary/[0.06] to-card px-4 py-3.5 shadow-sm">
         <span className="flex items-center gap-1.5">
-          <span className="size-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:0ms]" />
-          <span className="size-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:150ms]" />
-          <span className="size-1.5 animate-bounce rounded-full bg-brand-500 [animation-delay:300ms]" />
-          <span className="ml-1 text-xs font-medium text-muted-foreground">Checking your CareerOS data…</span>
+          <span className="size-2 animate-bounce rounded-full bg-gradient-to-br from-brand-500 to-pine-700 [animation-delay:0ms]" />
+          <span className="size-2 animate-bounce rounded-full bg-gradient-to-br from-brand-500 to-pine-700 [animation-delay:150ms]" />
+          <span className="size-2 animate-bounce rounded-full bg-gradient-to-br from-brand-500 to-pine-700 [animation-delay:300ms]" />
+          <span className="ml-1 text-xs font-medium text-muted-foreground">Thinking…</span>
         </span>
       </div>
     </div>
@@ -204,10 +200,10 @@ function MessageBubble({ message, isLastAssistant, toolsNote, offline, mode, onC
     <div className={cn("anim-hero-rise flex gap-3", isUser && "flex-row-reverse")}>
       <span
         className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-full shadow-sm",
+          "flex size-8 shrink-0 items-center justify-center rounded-full shadow-sm ring-1",
           isUser
-            ? "bg-gradient-to-br from-pine-800 to-brand-700 text-white"
-            : "bg-gradient-to-br from-brand-600 to-pine-800 text-white shadow-brand-900/20",
+            ? "bg-gradient-to-br from-pine-800 to-brand-700 text-white ring-white/20"
+            : "bg-gradient-to-br from-brand-600 to-pine-800 text-white shadow-brand-900/20 ring-brand-500/20",
         )}
         aria-hidden="true"
       >
@@ -216,10 +212,10 @@ function MessageBubble({ message, isLastAssistant, toolsNote, offline, mode, onC
       <div className={cn("min-w-0 max-w-[88%] sm:max-w-[78%]", isUser && "text-right")}>
         <div
           className={cn(
-            "px-4 py-3 text-sm leading-relaxed",
+            "px-4 py-3 text-sm leading-relaxed transition-shadow",
             isUser
-              ? "rounded-2xl rounded-tr-md bg-gradient-to-br from-pine-800 via-brand-800 to-brand-700 break-words whitespace-pre-wrap text-white shadow-md shadow-brand-900/20"
-              : "rounded-2xl rounded-tl-md border border-border/60 bg-card shadow-sm",
+              ? "rounded-2xl rounded-tr-md bg-gradient-to-br from-pine-800 via-brand-800 to-brand-600 break-words whitespace-pre-wrap text-white shadow-md shadow-brand-900/25"
+              : "rounded-2xl rounded-tl-md border border-border/60 bg-card shadow-card hover:shadow-card-hover",
           )}
         >
           {isUser ? message.content : <MarkdownAnswer content={message.content} />}
@@ -493,65 +489,56 @@ export default function AiAssistantPage() {
     <div className="space-y-5 pb-4">
       <Breadcrumb items={[{ label: "AI Assistant" }]} />
 
-      {/* ── Simple header — clean and student-friendly ── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-            <Sparkles className="size-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">AI Career Assistant</h1>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              Your friendly career helper. Ask anything — I answer using your own profile, CV and progress.
-            </p>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {isSmartGuidance ? (
-            <Badge variant="secondary" className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
-              <Database className="size-3" aria-hidden="true" /> Ready to use
-            </Badge>
-          ) : aiStatus?.configured ? (
-            <Badge variant="secondary" className="gap-1 bg-brand-600/10 text-brand-700 dark:text-brand-300">
-              <Zap className="size-3" aria-hidden="true" /> {aiStatus.model || "LLM"} ready
-            </Badge>
-          ) : null}
-          <Button size="sm" onClick={startNewConversation} className="btn-polish">
-            <Plus className="size-4" aria-hidden="true" />
-            New chat
-          </Button>
-        </div>
-      </div>
-
-      {/* ── How to use — 3 plain steps for students ── */}
-      <div className="grid gap-2.5 sm:grid-cols-3">
-        {HOW_IT_WORKS.map((s) => (
-          <div
-            key={s.n}
-            className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3 shadow-card"
-          >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-              {s.n}
+      {/* ── Hero header ── */}
+      <div className="relative overflow-hidden rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/[0.12] via-card to-card shadow-card">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage: "radial-gradient(var(--color-primary) 1px, transparent 1px)",
+            backgroundSize: "22px 22px",
+            WebkitMaskImage: "linear-gradient(115deg, black 0%, transparent 55%)",
+            maskImage: "linear-gradient(115deg, black 0%, transparent 55%)",
+            opacity: 0.12,
+          }}
+        />
+        <Bot aria-hidden="true" className="pointer-events-none absolute -right-5 -bottom-7 size-36 rotate-[-10deg] text-primary/[0.08]" />
+        <div className="relative flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="flex min-w-0 items-center gap-3.5">
+            <span className="relative flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-600 to-pine-800 text-white shadow-md shadow-brand-900/25">
+              <Sparkles className="size-5" aria-hidden="true" />
+              <span className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-card bg-emerald-500" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <p className="text-sm font-bold leading-none">{s.title}</p>
-              <p className="mt-1 truncate text-xs text-muted-foreground">{s.desc}</p>
+              <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">AI Career Assistant</h1>
+              <p className="mt-0.5 max-w-2xl truncate text-sm text-muted-foreground sm:whitespace-normal">
+                Ask anything — I answer using your own profile, CV and progress.
+              </p>
             </div>
           </div>
-        ))}
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {isSmartGuidance ? (
+              <Badge variant="secondary" className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+                <Database className="size-3" aria-hidden="true" /> Ready to use
+              </Badge>
+            ) : null}
+            <Button size="sm" onClick={startNewConversation} className="btn-polish shadow-md shadow-brand-600/25">
+              <Plus className="size-4" aria-hidden="true" />
+              New chat
+            </Button>
+          </div>
+        </div>
       </div>
 
       {showOfflineBanner && (
-        <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
-            <Sparkles className="size-4" aria-hidden="true" />
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-2.5">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+            <Sparkles className="size-3.5" aria-hidden="true" />
           </span>
-          <div>
-            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">Ready to use — no setup needed</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-              I answer from your saved data — profile, tests, roadmap, CV and LinkedIn. Just ask below.
-            </p>
-          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            <strong className="font-bold text-emerald-800 dark:text-emerald-300">Ready — no setup needed.</strong>{" "}
+            I answer from your saved data: profile, tests, roadmap, CV and LinkedIn.
+          </p>
         </div>
       )}
 
@@ -591,8 +578,8 @@ export default function AiAssistantPage() {
       )}
 
       <div className="grid items-start gap-4 lg:grid-cols-[300px_1fr]">
-        {/* ── Conversations sidebar ── */}
-        <Card className="overflow-hidden shadow-card">
+        {/* ── Conversations sidebar (sticky below the 64px navbar while the chat scrolls) ── */}
+        <Card className="overflow-hidden shadow-card lg:sticky lg:top-20">
           <CardContent className="p-0">
             <div className="flex items-center gap-2 border-b border-border/60 bg-muted/40 px-4 py-3">
               <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600/10 text-brand-700 dark:text-brand-300">
@@ -649,7 +636,7 @@ export default function AiAssistantPage() {
                           className={cn(
                             "group flex items-center gap-1 rounded-xl border px-2 py-2 transition",
                             active
-                              ? "border-brand-500/40 bg-brand-500/8 shadow-sm"
+                              ? "border-brand-500/40 bg-gradient-to-r from-brand-500/12 to-transparent shadow-sm"
                               : "border-transparent hover:border-border/60 hover:bg-muted/60",
                           )}
                         >
@@ -685,10 +672,10 @@ export default function AiAssistantPage() {
         </Card>
 
         {/* ── Chat panel ── */}
-        <Card className="flex min-h-[540px] flex-col overflow-hidden shadow-card">
+        <Card className="flex min-h-[540px] flex-col overflow-hidden border-primary/20 shadow-card">
           {/* Chat header */}
-          <div className="flex flex-wrap items-center gap-3 border-b border-border/60 bg-muted/40 px-4 py-3 sm:px-5">
-            <span className="relative flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-600 to-pine-800 text-white shadow-md shadow-brand-900/20">
+          <div className="flex flex-wrap items-center gap-3 border-b border-border/60 bg-gradient-to-r from-primary/[0.08] via-muted/40 to-transparent px-4 py-3 sm:px-5">
+            <span className="relative flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-600 to-pine-800 text-white shadow-md shadow-brand-900/25 ring-1 ring-white/20">
               <Bot className="size-5" aria-hidden="true" />
               <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-card bg-emerald-500" aria-hidden="true" />
             </span>
@@ -721,10 +708,11 @@ export default function AiAssistantPage() {
               </div>
             ) : activeMessages.length === 0 && !sending ? (
               <div className="mx-auto max-w-2xl py-2 text-center">
-                <span className="mx-auto flex size-14 items-center justify-center rounded-3xl bg-primary text-primary-foreground shadow-md">
+                <span className="relative mx-auto flex size-14 items-center justify-center rounded-3xl bg-gradient-to-br from-brand-600 to-pine-800 text-white shadow-lg shadow-brand-900/25">
                   <Sparkles className="size-7" aria-hidden="true" />
+                  <span className="absolute -right-1 -bottom-1 size-4 rounded-full border-[2.5px] border-background bg-emerald-500" aria-hidden="true" />
                 </span>
-                <h2 className="mt-4 text-lg font-bold tracking-tight">How can I help you today?</h2>
+                <h2 className="mt-4 text-lg font-extrabold tracking-tight">How can I help you today?</h2>
                 <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
                   I know your progress already. Just tap one — no need to type.
                 </p>
@@ -737,23 +725,20 @@ export default function AiAssistantPage() {
                         type="button"
                         disabled={sending}
                         onClick={() => sendMessage(card.query)}
-                        className="group rounded-2xl border border-border/60 bg-card p-3.5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-card-hover disabled:cursor-not-allowed disabled:opacity-50"
+                        className="group rounded-2xl border border-border/60 bg-card p-3.5 text-left shadow-card transition hover:-translate-y-1 hover:border-primary/50 hover:shadow-card-hover disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <span className="flex items-center gap-2">
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+                        <span className="flex items-center gap-2.5">
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-primary/20 transition group-hover:from-primary group-hover:to-brand-700 group-hover:text-primary-foreground">
                             <Icon className="size-4" aria-hidden="true" />
                           </span>
                           <span className="text-sm font-bold">{card.title}</span>
+                          <ArrowRight className="ml-auto size-3.5 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden="true" />
                         </span>
                         <span className="mt-1.5 block text-xs leading-relaxed text-muted-foreground">{card.desc}</span>
                       </button>
                     );
                   })}
                 </div>
-                <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[11px] font-semibold text-muted-foreground">
-                  <Check className="size-3.5 text-emerald-600" aria-hidden="true" />
-                  Free to use · Answers from your own data · Private to you
-                </p>
               </div>
             ) : (
               activeMessages.map((message, index) => (
@@ -775,8 +760,8 @@ export default function AiAssistantPage() {
           </div>
 
           {/* Composer */}
-          <form onSubmit={handleSubmit} className="border-t border-border/60 bg-card p-3 sm:p-4">
-            <div className="rounded-2xl border border-border/70 bg-background p-2 shadow-sm transition focus-within:border-brand-500/60 focus-within:ring-2 focus-within:ring-brand-500/20">
+          <form onSubmit={handleSubmit} className="border-t border-border/60 bg-gradient-to-t from-primary/[0.05] to-card p-3 sm:p-4">
+            <div className="rounded-2xl border border-border/70 bg-background p-2 shadow-card transition focus-within:border-brand-500/60 focus-within:shadow-card-hover focus-within:ring-2 focus-within:ring-brand-500/20">
               <textarea
                 ref={textareaRef}
                 value={input}

@@ -80,6 +80,7 @@
   --animate-fade-up: fade-up 0.35s ease-out;
   --animate-drawer-in: drawer-in 0.25s ease-out;
   --animate-zoom-in: zoom-in 0.2s ease-out;
+  --animate-roadmap-shine: roadmap-shine 2.8s ease-in-out infinite;
 
   @keyframes fade-in {
     from { opacity: 0; }
@@ -96,6 +97,10 @@
   @keyframes zoom-in {
     from { opacity: 0; transform: scale(0.96); }
     to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes roadmap-shine {
+    0% { transform: translateX(-100%); }
+    55%, 100% { transform: translateX(350%); }
   }
 }
 

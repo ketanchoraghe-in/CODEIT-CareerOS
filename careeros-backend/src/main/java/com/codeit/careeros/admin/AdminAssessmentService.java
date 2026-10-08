@@ -16,6 +16,7 @@ import com.codeit.careeros.exception.BusinessException;
 import com.codeit.careeros.mapper.AssessmentMapper;
 import com.codeit.careeros.mapper.CareerMapper;
 import com.codeit.careeros.repository.AssessmentAnswerRepository;
+import com.codeit.careeros.repository.AssessmentAttemptQuestionRepository;
 import com.codeit.careeros.repository.AssessmentAttemptRepository;
 import com.codeit.careeros.repository.AssessmentQuestionRepository;
 import com.codeit.careeros.repository.AssessmentTestRepository;
@@ -44,6 +45,7 @@ public class AdminAssessmentService {
     private final CareerRepository careerRepository;
     private final SkillRepository skillRepository;
     private final AssessmentAttemptRepository attemptRepository;
+    private final AssessmentAttemptQuestionRepository attemptQuestionRepository;
     private final AssessmentAnswerRepository answerRepository;
 
     @Transactional(readOnly = true)
@@ -193,8 +195,9 @@ public class AdminAssessmentService {
     public void deleteQuestion(Long questionId) {
         AssessmentQuestion question = questionRepository.findById(questionId)
                 .orElseThrow(() -> BusinessException.notFound("Question not found: " + questionId));
-        if (answerRepository.existsByQuestionId(questionId)) {
-            throw BusinessException.conflict("Question has student answers and cannot be deleted");
+        if (answerRepository.existsByQuestionId(questionId)
+                || attemptQuestionRepository.existsByQuestionId(questionId)) {
+            throw BusinessException.conflict("Question has student attempts and cannot be deleted");
         }
         optionRepository.deleteByQuestionId(questionId);
         questionRepository.delete(question);

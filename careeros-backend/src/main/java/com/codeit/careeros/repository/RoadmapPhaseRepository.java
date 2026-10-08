@@ -8,4 +8,6 @@ import java.util.List;
 public interface RoadmapPhaseRepository extends JpaRepository<RoadmapPhase, Long> {
 
     List<RoadmapPhase> findByCareerIdOrderByDisplayOrderAsc(Long careerId);
+
+    boolean existsByCareerId(Long careerId);
 }

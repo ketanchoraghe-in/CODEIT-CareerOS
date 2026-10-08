@@ -42,7 +42,13 @@ function AuthSplit({ title, description, eyebrow, children, footer }) {
           }}
         />
         <div className="relative flex items-center justify-between">
-          <LogoWordmark tone="light" size="text-lg" />
+          <Link
+            href="/"
+            aria-label="CODEIT CareerOS — back to home"
+            className="rounded-lg transition hover:opacity-85 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none"
+          >
+            <LogoWordmark tone="light" size="text-lg" />
+          </Link>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold text-brand-200 backdrop-blur">
             <GraduationCap className="size-3.5" aria-hidden="true" />
             Free for students
@@ -119,7 +125,13 @@ function AuthSplit({ title, description, eyebrow, children, footer }) {
           }}
         />
         <div className="mb-6 lg:hidden">
-          <LogoWordmark size="text-lg" />
+          <Link
+            href="/"
+            aria-label="CODEIT CareerOS — back to home"
+            className="inline-block rounded-lg transition hover:opacity-85 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+          >
+            <LogoWordmark size="text-lg" />
+          </Link>
         </div>
 
         <div className="relative w-full max-w-md rounded-3xl border border-border/60 bg-card p-6 shadow-popover sm:p-8">

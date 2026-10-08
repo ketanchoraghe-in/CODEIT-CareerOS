@@ -8,4 +8,6 @@ import java.util.List;
 public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     List<Project> findByCareerIdAndPublishedTrueOrderByDisplayOrderAsc(Long careerId);
+
+    boolean existsByCareerId(Long careerId);
 }

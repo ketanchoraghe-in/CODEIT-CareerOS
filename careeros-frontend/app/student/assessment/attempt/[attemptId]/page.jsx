@@ -359,7 +359,8 @@ export default function AttemptRunnerPage() {
         }
       />
 
-      <Card className="shadow-card">
+      <div className="sticky top-16 z-20 space-y-2">
+        <Card className="border-primary/20 bg-card/95 shadow-card backdrop-blur supports-[backdrop-filter]:bg-card/90">
         <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-3 py-4">
           <span className="inline-flex items-center gap-2 text-sm font-semibold">
             <Clock3 className="size-4 text-primary" aria-hidden="true" />
@@ -410,14 +411,15 @@ export default function AttemptRunnerPage() {
             </Button>
           </span>
         </CardContent>
-      </Card>
-      <div>
-        <Progress
-          value={totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0}
-          tone="primary"
-          className="h-2"
-          aria-label={`Answered ${answeredCount} of ${totalQuestions} questions`}
-        />
+        </Card>
+        <div>
+          <Progress
+            value={totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0}
+            tone="primary"
+            className="h-2"
+            aria-label={`Answered ${answeredCount} of ${totalQuestions} questions`}
+          />
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -481,6 +483,16 @@ export default function AttemptRunnerPage() {
             ? "All questions answered — ready to submit."
             : `${unanswered} of ${totalQuestions} unanswered.`}
         </p>
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-sm font-semibold">
+          <Clock3 className="size-3.5 text-primary" aria-hidden="true" />
+          {secondsLeft === null ? (
+            <span className="text-muted-foreground">--:--</span>
+          ) : (
+            <span className={lowTime ? "text-destructive" : ""} aria-live="polite">
+              {formatRemaining(secondsLeft)}
+            </span>
+          )}
+        </span>
         <Button size="sm" disabled={submitting || pendingSaves > 0} onClick={() => {
           if (unanswered > 0) setConfirmOpen(true);
           else doSubmit(false);

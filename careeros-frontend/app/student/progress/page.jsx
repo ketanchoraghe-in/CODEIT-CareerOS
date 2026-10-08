@@ -7,6 +7,7 @@ import {
   ClipboardList,
   FileText,
   FolderKanban,
+  Radar,
   Route,
   Share2,
   Target,
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CircularProgress } from "@/components/ui/circular-progress";
 import { Progress } from "@/components/ui/progress";
+import { SkillRadar } from "@/components/charts";
 import { Breadcrumb } from "@/components/breadcrumb";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
@@ -80,6 +82,17 @@ export default function StudentProgressPage() {
   const improved = gaps.filter((g) => g.assessed && g.metTarget).length;
   const projectTotal = projects.totalProjects ?? 0;
   const projectPct = projectTotal > 0 ? Math.round(((projects.completedProjects ?? 0) / projectTotal) * 100) : 0;
+
+  // Radar graph: biggest gaps first so the weakest areas stand out, max 8 axes.
+  const rankedGaps = [...gaps].sort((a, b) => (b.gapPercent ?? 0) - (a.gapPercent ?? 0));
+  const radarSkills = rankedGaps.slice(0, 8).map((g) => ({
+    name: g.skillName,
+    score: g.assessed ? (g.scorePercent ?? 0) : 0,
+    assessed: Boolean(g.assessed),
+    target: g.targetPercent ?? 100,
+  }));
+  const radarOverflow = gaps.length - radarSkills.length;
+  const biggestGap = rankedGaps.length > 0 ? rankedGaps[0] : null;
 
   return (
     <div className="space-y-6">
@@ -188,7 +201,61 @@ export default function StudentProgressPage() {
         </Card>
       </div>
 
-      {/* 2. Skill progress */}
+      {/* 2. Progress graph — you vs your target */}
+      {hasTarget && radarSkills.length >= 3 && (
+        <Card className="overflow-hidden border-primary/25 bg-gradient-to-br from-primary/[0.07] via-card to-card shadow-card">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-[0_4px_12px_var(--color-primary)/40]">
+                  <Radar className="size-4" aria-hidden="true" />
+                </span>
+                <div>
+                  <CardTitle className="text-base">Your Progress Graph</CardTitle>
+                  <CardDescription>
+                    Green shape is you · dashed gold ring is your {readiness.targetCareerName} target — the closer they overlap, the more job-ready you are.
+                  </CardDescription>
+                </div>
+              </div>
+              <Badge variant="secondary" className="bg-emerald-500/10 font-extrabold text-emerald-700 dark:text-emerald-400">
+                {improved} of {gaps.length} skills on target
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid items-center gap-6 lg:grid-cols-[1.4fr_1fr]">
+              <SkillRadar skills={radarSkills} />
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Readiness</p>
+                  <p className="mt-1 text-3xl font-extrabold tracking-tight text-primary">{readiness.readinessPercent ?? 0}<span className="text-base font-bold">%</span></p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{prettifyEnum(readiness.readinessLevel)} · {readiness.metSkills ?? 0}/{readiness.totalSkills ?? 0} skills at target</p>
+                </div>
+                {biggestGap && (
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.07] p-4">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-400">Focus next</p>
+                    <p className="mt-1 text-sm font-bold">{biggestGap.skillName}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {biggestGap.assessed ? `You ${biggestGap.scorePercent ?? 0}% · needs ${biggestGap.targetPercent}% (gap ${biggestGap.gapPercent ?? 0}%)` : `Not assessed yet · target ${biggestGap.targetPercent}%`}
+                    </p>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" render={<Link href="/student/assessment" />}>Take assessment</Button>
+                  <Button size="sm" variant="outline" render={<Link href="/student/roadmap" />}>View roadmap <ArrowRight className="size-3.5" aria-hidden="true" /></Button>
+                </div>
+                {radarOverflow > 0 && (
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    Showing your {radarSkills.length} weakest of {gaps.length} skills — the full list is below.
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 3. Skill progress */}
       <Card className="shadow-card">
         <CardHeader>
           <CardTitle className="text-base">Skill Progress</CardTitle>
