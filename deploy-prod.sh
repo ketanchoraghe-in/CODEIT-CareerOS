@@ -116,6 +116,11 @@ done
 
 # shellcheck disable=SC1090
 set -a; . "./$ENV_FILE"; set +a
+# Proxy mode: browsers must use same-origin /api (never call the backend
+# directly), so a stale FRONTEND_API_URL from an older backend.env must not
+# leak into the frontend build through the exported environment.
+export FRONTEND_API_URL=""
+export API_PROXY_URL="http://backend:8080"
 
 TABLE_COUNT="$(docker compose -f "$COMPOSE_FILE" exec -T mysql \
   mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -N -e \
@@ -139,7 +144,7 @@ fi
 
 # --- 3. Build + start everything (rebuild bakes the API proxy target in) -----
 echo "Building and starting the full stack ..."
-API_PROXY_URL="http://backend:8080" docker compose -f "$COMPOSE_FILE" up -d --build
+docker compose -f "$COMPOSE_FILE" up -d --build
 
 echo "Waiting for the backend API ..."
 HEALTHY=false
