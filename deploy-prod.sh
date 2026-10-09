@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+# =============================================================================
+# CODEIT CareerOS — one-command production deploy (run on the server, repo root)
+#
+#   ./deploy-prod.sh 13.201.83.135
+#   ./deploy-prod.sh careeros.your-college.edu --https
+#
+# What it fixes (the usual "site opens but nothing works" causes):
+#   1. Same-origin /api proxy: browsers call this site's own /api/* (no more
+#      mixed-content block on HTTPS, no CORS), the Next server forwards to the
+#      backend over the compose network. Rebuild bakes the proxy target in.
+#   2. Backend CORS -> sets CORS_ALLOWED_ORIGINS to the real frontend origin.
+#   3. Missing/placeholder secrets -> generates JWT/DB passwords on first run.
+#   4. Fresh database + prod `validate` mode -> one-time schema bootstrap on an
+#      EMPTY database only (never touches existing data).
+#
+# Requirements on the server: docker (with compose plugin), openssl, curl.
+# Only the frontend port must be reachable from browsers (default 3000, or 443
+# behind your TLS reverse proxy) — the backend port stays internal.
+# =============================================================================
+set -euo pipefail
+
+COMPOSE_FILE="docker-compose.prod.yml"
+ENV_FILE="backend.env"
+MARKER_FILE=".prod-db-initialized"
+
+HOST=""
+SCHEME="http"
+FRONTEND_PORT="3000"
+
+usage() {
+  echo "Usage: $0 <public-host-or-ip> [--https] [--frontend-port PORT]"
+  echo "Example: $0 13.201.83.135"
+  echo "Example: $0 careeros.your-college.edu --https"
+  exit 1
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --https) SCHEME="https"; FRONTEND_PORT="443"; shift ;;
+    --frontend-port) FRONTEND_PORT="$2"; shift 2 ;;
+    -h|--help) usage ;;
+    *) if [ -z "$HOST" ]; then HOST="$1"; shift; else usage; fi ;;
+  esac
+done
+[ -z "$HOST" ] && usage
+
+# --- 0. Preconditions ---------------------------------------------------------
+command -v docker >/dev/null || { echo "ERROR: docker not found."; exit 1; }
+docker compose version >/dev/null || { echo "ERROR: docker compose plugin not found."; exit 1; }
+command -v openssl >/dev/null || { echo "ERROR: openssl not found."; exit 1; }
+command -v curl >/dev/null || { echo "ERROR: curl not found."; exit 1; }
+[ -f "$COMPOSE_FILE" ] || { echo "ERROR: run this from the repo root ($COMPOSE_FILE missing)."; exit 1; }
+[ -f ".env.example" ] || { echo "ERROR: .env.example missing."; exit 1; }
+
+origin_of() { # $1=scheme $2=host $3=port -> origin, omitting default ports
+  if { [ "$1" = "http" ] && [ "$3" = "80" ]; } || { [ "$1" = "https" ] && [ "$3" = "443" ]; }; then
+    echo "$1://$2"
+  else
+    echo "$1://$2:$3"
+  fi
+}
+
+FRONTEND_ORIGIN="$(origin_of "$SCHEME" "$HOST" "$FRONTEND_PORT")"
+echo "Frontend origin : $FRONTEND_ORIGIN"
+echo "API access      : same-origin $FRONTEND_ORIGIN/api/* -> backend:8080 (no browser CORS)"
+
+# --- 1. backend.env ------------------------------------------------------------
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Creating $ENV_FILE from .env.example ..."
+  cp .env.example "$ENV_FILE"
+fi
+
+set_kv() { # $1=KEY $2=value -> replace line (or append) in backend.env
+  local key="$1" value="$2"
+  if grep -q "^${key}=" "$ENV_FILE"; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+  else
+    echo "${key}=${value}" >> "$ENV_FILE"
+  fi
+}
+
+FIRST_RUN=false
+if grep -q "CHANGE_ME" "$ENV_FILE"; then
+  FIRST_RUN=true
+  echo "First run: generating secrets ..."
+  set_kv "JWT_SECRET" "$(openssl rand -base64 48)"
+  ROOT_PW="$(openssl rand -hex 24)"
+  APP_PW="$(openssl rand -hex 24)"
+  set_kv "MYSQL_ROOT_PASSWORD" "$ROOT_PW"
+  set_kv "MYSQL_PASSWORD" "$APP_PW"
+  set_kv "DB_PASSWORD" "$APP_PW"
+  ADMIN_PW="Admin@$(openssl rand -hex 4)"
+  set_kv "ADMIN_EMAIL" "admin@careeros.local"
+  set_kv "ADMIN_PASSWORD" "$ADMIN_PW"
+  echo "  -> generated JWT_SECRET, DB passwords, admin password (shown at the end)."
+fi
+
+# Always align these with the real public host (the core fix).
+set_kv "CORS_ALLOWED_ORIGINS" "$FRONTEND_ORIGIN"
+set_kv "SPRING_PROFILES_ACTIVE" "prod"
+
+# File uploads: S3 needs a real bucket + credentials. Without one, use the
+# persisted local volume (/data, see docker-compose.prod.yml) so CV upload /
+# analysis / download and profile photos work out of the box.
+BUCKET="$(grep "^CV_S3_BUCKET=" "$ENV_FILE" | cut -d= -f2- || true)"
+if [ -z "$BUCKET" ] || [[ "$BUCKET" == *"your-careeros-cv-bucket"* ]] || [[ "$BUCKET" == *"CHANGE_ME"* ]]; then
+  set_kv "CV_STORAGE" "local"
+  set_kv "CV_LOCAL_DIR" "/data/cv-storage"
+  set_kv "PROFILE_PHOTO_DIR" "/data/profile-photos"
+  echo "No S3 bucket configured: using persisted local upload storage."
+fi
+if ! grep -q "^ADMIN_EMAIL=" "$ENV_FILE"; then
+  set_kv "ADMIN_EMAIL" "admin@careeros.local"
+fi
+
+# --- 2. Start MySQL first (so we can inspect it before booting the API) --------
+echo "Starting MySQL ..."
+docker compose -f "$COMPOSE_FILE" up -d mysql
+echo "Waiting for MySQL to become healthy ..."
+for _ in $(seq 1 30); do
+  if docker compose -f "$COMPOSE_FILE" ps mysql --format '{{.Health}}' 2>/dev/null | grep -qi "healthy"; then
+    break
+  fi
+  sleep 5
+done
+
+# shellcheck disable=SC1090
+set -a; . "./$ENV_FILE"; set +a
+# Proxy mode: browsers must use same-origin /api (never call the backend
+# directly), so a stale FRONTEND_API_URL from an older backend.env must not
+# leak into the frontend build through the exported environment.
+export FRONTEND_API_URL=""
+export API_PROXY_URL="http://backend:8080"
+
+TABLE_COUNT="$(docker compose -f "$COMPOSE_FILE" exec -T mysql \
+  mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -N -e \
+  "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${DB_NAME:-careeros}';" 2>/dev/null | tr -d '[:space:]' || echo "unknown")"
+echo "Tables in '${DB_NAME:-careeros}': $TABLE_COUNT"
+
+if [ "$TABLE_COUNT" = "0" ] && [ ! -f "$MARKER_FILE" ]; then
+  echo "Empty database on first deploy: one-time schema bootstrap with ddl-auto=update ..."
+  echo "  (safe: there is no data yet; afterwards prod runs on validate per docs.)"
+  set_kv "JPA_DDL_AUTO" "update"
+else
+  if [ "$TABLE_COUNT" = "unknown" ]; then
+    echo "WARNING: could not inspect the database; leaving JPA_DDL_AUTO untouched."
+  else
+    echo "Existing data found (${TABLE_COUNT} tables): keeping JPA_DDL_AUTO=validate (never auto-migrates)."
+  fi
+  if ! grep -q "^JPA_DDL_AUTO=" "$ENV_FILE"; then
+    set_kv "JPA_DDL_AUTO" "validate"
+  fi
+fi
+
+# --- 3. Build + start everything (rebuild bakes the API proxy target in) -----
+echo "Building and starting the full stack ..."
+docker compose -f "$COMPOSE_FILE" up -d --build
+
+echo "Waiting for the backend API ..."
+HEALTHY=false
+for _ in $(seq 1 36); do
+  if curl -fsS -m 5 "http://localhost:8080/actuator/health" 2>/dev/null | grep -q '"UP"'; then
+    HEALTHY=true
+    break
+  fi
+  sleep 5
+done
+if [ "$HEALTHY" != "true" ]; then
+  echo "ERROR: backend did not become healthy. Recent logs:"
+  docker compose -f "$COMPOSE_FILE" logs --tail=60 backend || true
+  exit 1
+fi
+echo "Backend is UP."
+
+# --- 4. After a bootstrap boot, lock prod back to validate --------------------
+if [ "$TABLE_COUNT" = "0" ] && [ ! -f "$MARKER_FILE" ]; then
+  echo "Locking prod back to JPA_DDL_AUTO=validate and restarting the API ..."
+  set_kv "JPA_DDL_AUTO" "validate"
+  docker compose -f "$COMPOSE_FILE" up -d backend
+  for _ in $(seq 1 36); do
+    if curl -fsS -m 5 "http://localhost:8080/actuator/health" 2>/dev/null | grep -q '"UP"'; then
+      HEALTHY=true
+      break
+    fi
+    sleep 5
+  done
+  if [ "$HEALTHY" != "true" ]; then
+    echo "ERROR: backend failed to restart on validate. Logs:"
+    docker compose -f "$COMPOSE_FILE" logs --tail=60 backend || true
+    exit 1
+  fi
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > "$MARKER_FILE"
+  echo "Schema bootstrap complete."
+fi
+
+# --- 5. Summary -----------------------------------------------------------------
+echo
+echo "================ DEPLOY COMPLETE ================"
+echo "Open the app : $FRONTEND_ORIGIN"
+echo "API (proxied): $FRONTEND_ORIGIN/api/v1/... (same origin, no mixed content)"
+if [ "$FIRST_RUN" = true ]; then
+  # shellcheck disable=SC1090
+  set -a; . "./$ENV_FILE"; set +a
+  echo "Admin login  : ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}"
+  echo "  (change the admin password after first login; it is only used on empty DB)"
+fi
+echo "Still stuck? On the site press F12 -> Console and read the red lines:"
+echo "  calls to http://...:8080 = old build still serving; redeploy to rebuild."
+echo "================================================="

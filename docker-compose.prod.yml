@@ -31,6 +31,10 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/${DB_NAME:-careeros}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectionTimeZone=UTC
+    volumes:
+      # Persisted upload store for CV files + profile photos when CV_STORAGE=local
+      # (deploy-prod.sh default without a real S3 bucket). Survives rebuilds.
+      - upload-data:/data
     ports:
       - "8080:8080"
     depends_on:
@@ -41,7 +45,12 @@ services:
     build:
       context: ./careeros-frontend
       args:
-        NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-http://localhost:8080}
+        # Server-side proxy target (inside the compose network). Browsers use
+        # same-origin /api/*, so NEXT_PUBLIC_API_URL stays empty unless you
+        # deliberately want browsers to call a backend directly (needs HTTPS
+        # API + CORS then — not recommended).
+        API_PROXY_URL: http://backend:8080
+        NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-}
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -50,3 +59,4 @@ services:
 
 volumes:
   mysql-data:
+  upload-data:

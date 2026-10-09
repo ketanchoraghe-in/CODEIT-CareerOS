@@ -61,12 +61,24 @@ All in `.env.example` (placeholders only — never commit real values):
 | CORS  | `CORS_ALLOWED_ORIGINS` (comma-separated, never `*` with credentials) |
 | AI    | `AI_PROVIDER` (openai/gemini/ollama/custom), `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, iteration/history/timeout/rate-limit guards |
 | CV/S3  | `CV_STORAGE=s3`, `CV_S3_BUCKET`, `CV_S3_REGION`, `CV_S3_PREFIX`, `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` (or IAM role) |
-| Frontend | `NEXT_PUBLIC_API_URL` / `FRONTEND_API_URL` (public, build-time) |
+| Frontend | `API_PROXY_URL` (server-side proxy target, build-time) · `NEXT_PUBLIC_API_URL` (only to bypass the same-origin `/api` proxy) |
 
 AI keys stay **server-side only** — the browser never sees them.
 Local AI walkthrough: `careeros-backend/.env.example`.
 
 ## Production deployment (Docker)
+
+Easiest — one command on the server (from the repo root):
+
+```bash
+./deploy-prod.sh 13.201.83.135
+```
+
+It creates `backend.env` (generating secrets on first run), points the
+frontend build and backend CORS at your public host, bootstraps the schema
+on an empty database only, then builds and health-checks everything.
+
+Manual equivalent:
 
 ```powershell
 cp .env.example backend.env   # fill in real values (never commit)
