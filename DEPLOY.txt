@@ -1,0 +1,28 @@
+CODEIT CareerOS — deploy from this zip (run these ON THE SERVER)
+====================================================================
+
+1. Unzip this file and open a terminal inside the unzipped folder:
+
+     cd CODEIT-CareerOS
+
+2. Deploy with one command (replace the domain only if yours differs):
+
+     chmod +x deploy-prod.sh
+     ./deploy-prod.sh careeros.codeitinfotech.com --https
+
+   The script will:
+   - create backend.env and generate secrets on first run (never share it),
+   - rebuild the frontend so browsers use your own domain for /api
+     (this fixes "Unable to reach the server" on register/login),
+   - create the database tables on an empty database only
+     (existing data is never changed),
+   - start everything and check the backend is healthy.
+
+3. Keep your existing HTTPS setup pointing at port 3000 (unchanged).
+
+4. Open https://careeros.codeitinfotech.com/register and create an
+   account. Old accounts from another machine do NOT transfer — register
+   fresh on the live site.
+
+If register still fails: on the site press F12 -> Console, copy the red
+lines and send them to the developer.
