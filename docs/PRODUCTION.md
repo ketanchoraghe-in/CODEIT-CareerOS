@@ -9,7 +9,8 @@ Local development is covered in `README.md`; database backup/restore detail live
 - **Backend:** Java 21 + Spring Boot 3.5 (`careeros-backend`), Spring Security (JWT),
   Spring Data JPA, MySQL 8 only (H2 for tests only). Base API path `/api/v1`.
 - **Frontend:** Next.js 16 + React 19 + Tailwind 4 (`careeros-frontend`, `output: "standalone"`).
-  Browser calls the API via `NEXT_PUBLIC_API_URL` (public endpoint only, baked at build time).
+  Browsers call same-origin `/api/*`, which Next rewrites server-side to the backend
+  (`API_PROXY_URL`) — no mixed-content block on HTTPS, no browser CORS involved.
 - **AI:** Spring AI with provider abstraction (OpenAI-compatible or Gemini), 8 allowlisted
   CareerOS tools, max 6 tool iterations, per-user rate limit, offline Smart Guidance fallback.
 - **CV storage:** S3 in prod (`S3CvStorage`, private objects), local directory in dev/test.
@@ -64,7 +65,8 @@ cp .env.example backend.env      # fill in, keep on the host
 | `CV_S3_BUCKET` | prod (s3): yes | Private bucket name |
 | `CV_S3_REGION` | no | Default `us-east-1` |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | if no IAM role | Prefer IAM role; keys stay server-side |
-| `FRONTEND_API_URL` | prod compose | Public API base URL baked into frontend image |
+| `FRONTEND_API_URL` | no | Leave empty (default): browsers use same-origin `/api/*`, proxied server-side. Set only to bypass the proxy (then it must be https + in CORS origins) |
+| `API_PROXY_URL` | prod compose | Server-side proxy target, e.g. `http://backend:8080` (never reaches browsers) |
 | `SERVER_PORT` | no | Default `8080` |
 
 `NEXT_PUBLIC_*` vars are embedded in the browser bundle — public endpoint URLs only, never keys.
@@ -96,7 +98,8 @@ npm run build     # bakes NEXT_PUBLIC_API_URL
 npm start         # serves standalone server on :3000
 ```
 
-Build arg: `NEXT_PUBLIC_API_URL=https://api.example.com`.
+Build arg: `API_PROXY_URL=http://backend:8080` (server-side target).
+`NEXT_PUBLIC_API_URL` only to bypass the proxy (browsers call the API directly).
 
 ## 7–8. AI provider setup (OpenAI / Gemini)
 
@@ -190,4 +193,4 @@ JWT secret check) is covered by boot-time behavior, not fabricated data.
 | AI says unavailable | No key + `AI_OFFLINE_FALLBACK=false` | Set key or re-enable fallback |
 | CV upload rejected | >5 MB or non pdf/doc/docx | Compress/convert client-side |
 | Swagger 404 in prod | Intended | Use dev env for API exploration |
-| `docker compose` uses old API URL | Frontend bakes URL at build time | Rebuild frontend after changing `FRONTEND_API_URL` |
+| Signup/login fails on HTTPS site | Browser calls `http://…:8080` directly (mixed-content block) | Deploy with the same-origin `/api` proxy (default): rebuild frontend so `NEXT_PUBLIC_API_URL` stays empty |

@@ -1,7 +1,10 @@
 import axios from "axios";
 import { auth } from "@/lib/auth";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+// Same-origin by default: browsers call this site's own /api/*, which Next
+// rewrites (server-side) to the backend — no mixed-content block on HTTPS,
+// no CORS. Set NEXT_PUBLIC_API_URL only to call a backend directly.
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export class ApiError extends Error {
   constructor(message, { status, errorCode, fieldErrors } = {}) {

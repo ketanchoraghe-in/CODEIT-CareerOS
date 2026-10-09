@@ -6,16 +6,17 @@
 #   ./deploy-prod.sh careeros.your-college.edu --https
 #
 # What it fixes (the usual "site opens but nothing works" causes):
-#   1. Frontend API URL is baked in at BUILD time -> sets FRONTEND_API_URL to
-#      this server and rebuilds, so browsers call the real backend instead of
-#      their own localhost:8080.
+#   1. Same-origin /api proxy: browsers call this site's own /api/* (no more
+#      mixed-content block on HTTPS, no CORS), the Next server forwards to the
+#      backend over the compose network. Rebuild bakes the proxy target in.
 #   2. Backend CORS -> sets CORS_ALLOWED_ORIGINS to the real frontend origin.
 #   3. Missing/placeholder secrets -> generates JWT/DB passwords on first run.
 #   4. Fresh database + prod `validate` mode -> one-time schema bootstrap on an
 #      EMPTY database only (never touches existing data).
 #
 # Requirements on the server: docker (with compose plugin), openssl, curl.
-# Ports 3000 (frontend) and 8080 (API) must be reachable from browsers.
+# Only the frontend port must be reachable from browsers (default 3000, or 443
+# behind your TLS reverse proxy) — the backend port stays internal.
 # =============================================================================
 set -euo pipefail
 
@@ -26,10 +27,9 @@ MARKER_FILE=".prod-db-initialized"
 HOST=""
 SCHEME="http"
 FRONTEND_PORT="3000"
-API_PORT="8080"
 
 usage() {
-  echo "Usage: $0 <public-host-or-ip> [--https] [--frontend-port PORT] [--api-port PORT]"
+  echo "Usage: $0 <public-host-or-ip> [--https] [--frontend-port PORT]"
   echo "Example: $0 13.201.83.135"
   echo "Example: $0 careeros.your-college.edu --https"
   exit 1
@@ -37,9 +37,8 @@ usage() {
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --https) SCHEME="https"; FRONTEND_PORT="443"; API_PORT="443"; shift ;;
+    --https) SCHEME="https"; FRONTEND_PORT="443"; shift ;;
     --frontend-port) FRONTEND_PORT="$2"; shift 2 ;;
-    --api-port) API_PORT="$2"; shift 2 ;;
     -h|--help) usage ;;
     *) if [ -z "$HOST" ]; then HOST="$1"; shift; else usage; fi ;;
   esac
@@ -63,9 +62,8 @@ origin_of() { # $1=scheme $2=host $3=port -> origin, omitting default ports
 }
 
 FRONTEND_ORIGIN="$(origin_of "$SCHEME" "$HOST" "$FRONTEND_PORT")"
-API_URL="$(origin_of "$SCHEME" "$HOST" "$API_PORT")"
 echo "Frontend origin : $FRONTEND_ORIGIN"
-echo "Public API URL  : $API_URL"
+echo "API access      : same-origin $FRONTEND_ORIGIN/api/* -> backend:8080 (no browser CORS)"
 
 # --- 1. backend.env ------------------------------------------------------------
 if [ ! -f "$ENV_FILE" ]; then
@@ -139,9 +137,9 @@ else
   fi
 fi
 
-# --- 3. Build + start everything (rebuild bakes FRONTEND_API_URL in) ----------
+# --- 3. Build + start everything (rebuild bakes the API proxy target in) -----
 echo "Building and starting the full stack ..."
-FRONTEND_API_URL="$API_URL" docker compose -f "$COMPOSE_FILE" up -d --build
+API_PROXY_URL="http://backend:8080" docker compose -f "$COMPOSE_FILE" up -d --build
 
 echo "Waiting for the backend API ..."
 HEALTHY=false
@@ -184,7 +182,7 @@ fi
 echo
 echo "================ DEPLOY COMPLETE ================"
 echo "Open the app : $FRONTEND_ORIGIN"
-echo "API health   : $API_URL/actuator/health"
+echo "API (proxied): $FRONTEND_ORIGIN/api/v1/... (same origin, no mixed content)"
 if [ "$FIRST_RUN" = true ]; then
   # shellcheck disable=SC1090
   set -a; . "./$ENV_FILE"; set +a
@@ -192,5 +190,5 @@ if [ "$FIRST_RUN" = true ]; then
   echo "  (change the admin password after first login; it is only used on empty DB)"
 fi
 echo "Still stuck? On the site press F12 -> Console and read the red lines:"
-echo "  'localhost:8080' failures = rebuild did not happen; CORS errors = wrong origin."
+echo "  calls to http://...:8080 = old build still serving; redeploy to rebuild."
 echo "================================================="

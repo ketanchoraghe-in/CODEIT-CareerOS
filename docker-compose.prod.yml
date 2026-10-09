@@ -41,7 +41,12 @@ services:
     build:
       context: ./careeros-frontend
       args:
-        NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-http://localhost:8080}
+        # Server-side proxy target (inside the compose network). Browsers use
+        # same-origin /api/*, so NEXT_PUBLIC_API_URL stays empty unless you
+        # deliberately want browsers to call a backend directly (needs HTTPS
+        # API + CORS then — not recommended).
+        API_PROXY_URL: http://backend:8080
+        NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-}
     restart: unless-stopped
     ports:
       - "3000:3000"

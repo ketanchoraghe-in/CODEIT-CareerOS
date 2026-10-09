@@ -61,7 +61,7 @@ All in `.env.example` (placeholders only — never commit real values):
 | CORS  | `CORS_ALLOWED_ORIGINS` (comma-separated, never `*` with credentials) |
 | AI    | `AI_PROVIDER` (openai/gemini/ollama/custom), `AI_API_KEY`, `AI_MODEL`, `AI_BASE_URL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, iteration/history/timeout/rate-limit guards |
 | CV/S3  | `CV_STORAGE=s3`, `CV_S3_BUCKET`, `CV_S3_REGION`, `CV_S3_PREFIX`, `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` (or IAM role) |
-| Frontend | `NEXT_PUBLIC_API_URL` / `FRONTEND_API_URL` (public, build-time) |
+| Frontend | `API_PROXY_URL` (server-side proxy target, build-time) · `NEXT_PUBLIC_API_URL` (only to bypass the same-origin `/api` proxy) |
 
 AI keys stay **server-side only** — the browser never sees them.
 Local AI walkthrough: `careeros-backend/.env.example`.

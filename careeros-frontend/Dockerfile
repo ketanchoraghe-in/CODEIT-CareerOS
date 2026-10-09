@@ -1,14 +1,18 @@
 # Sprint 8 production image for the Next.js frontend.
 # Uses the self-contained "standalone" build (see next.config.mjs).
-# NEXT_PUBLIC_API_URL is baked at BUILD time (public, not a secret) —
-# pass it with --build-arg or via Compose (see docker-compose.prod.yml).
+# Browsers call this site's own /api/* (same origin — no mixed-content/CORS
+# issues); the Next server proxies to API_PROXY_URL server-side.
+# Pass both with --build-arg or via Compose (see docker-compose.prod.yml).
+# NEXT_PUBLIC_API_URL is only needed to bypass the proxy (public, not secret).
 
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-ARG NEXT_PUBLIC_API_URL=http://localhost:8080
+ARG API_PROXY_URL=http://localhost:8080
+ARG NEXT_PUBLIC_API_URL=""
+ENV API_PROXY_URL=$API_PROXY_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
