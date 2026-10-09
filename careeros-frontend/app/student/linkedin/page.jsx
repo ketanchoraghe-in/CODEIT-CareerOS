@@ -11,7 +11,6 @@ import {
   Briefcase,
   CheckCircle2,
   Circle,
-  Compass,
   ExternalLink,
   Eye,
   FileText,
@@ -362,13 +361,13 @@ export default function StudentLinkedInPage() {
   ];
 
   return (
-    <div className="space-y-6 pb-4">
+    <div className="space-y-5">
       <Breadcrumb items={[{ label: "LinkedIn Analysis" }]} />
 
-      {/* ── Simple header — clean, matches other modules ── */}
+      {/* ── Header ── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
             <LinkedInIcon className="size-5" />
           </span>
           <div className="min-w-0">
@@ -380,18 +379,15 @@ export default function StudentLinkedInPage() {
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {analysis?.hasTarget ? (
-                <Badge variant="secondary" className="gap-1 bg-primary/10 text-primary">
+                <Badge variant="secondary">
                   <Target className="size-3" aria-hidden="true" />
                   Target: {analysis.careerName}
                 </Badge>
               ) : (
-                <Badge variant="secondary" className="gap-1 bg-amber-500/15 text-amber-700 dark:text-amber-400">
-                  <Compass className="size-3" aria-hidden="true" />
-                  No target career yet
-                </Badge>
+                <Badge variant="secondary">No target career yet</Badge>
               )}
               {hasProfile && (
-                <Badge variant="secondary" className="gap-1 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+                <Badge variant="secondary">
                   <BadgeCheck className="size-3" aria-hidden="true" />
                   Profile linked
                 </Badge>
@@ -402,10 +398,6 @@ export default function StudentLinkedInPage() {
                 </span>
               )}
             </div>
-            <p className="mt-1.5 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <Eye className="size-3.5" aria-hidden="true" />
-              Recruiters decide in ~7 seconds — this page makes those seconds count.
-            </p>
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -413,7 +405,6 @@ export default function StudentLinkedInPage() {
             <Button
               size="sm"
               variant="outline"
-              className="btn-polish"
               render={<a href={analysis.profile.profileUrl} target="_blank" rel="noreferrer" />}
             >
               Open my LinkedIn
@@ -422,7 +413,6 @@ export default function StudentLinkedInPage() {
           ) : (
             <Button
               size="sm"
-              className="btn-polish"
               onClick={() => document.getElementById("linkedin-form")?.scrollIntoView({ behavior: "smooth" })}
             >
               Link my profile
@@ -430,7 +420,7 @@ export default function StudentLinkedInPage() {
             </Button>
           )}
           {!analysis?.hasTarget && (
-            <Button size="sm" variant="outline" className="btn-polish" render={<Link href="/student/careers" />}>
+            <Button size="sm" variant="outline" render={<Link href="/student/careers" />}>
               <Target className="size-3.5" aria-hidden="true" />
               Choose career
             </Button>
@@ -438,66 +428,59 @@ export default function StudentLinkedInPage() {
         </div>
       </div>
 
-      {/* ── Journey steps ───────────────────────────────────────── */}
+      {/* ── Steps ── */}
       <ol className="grid gap-3 sm:grid-cols-3">
-        {steps.map((s, i) => {
+        {steps.map((s) => {
           const Icon = s.icon;
           return (
             <li
               key={s.n}
               className={cn(
-                "relative flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-card transition hover:shadow-card-hover",
+                "flex items-center gap-3 rounded-xl border bg-card p-3.5 shadow-card",
                 s.done
-                  ? "border-chart-3/30"
+                  ? "border-border/60"
                   : s.active
-                    ? "border-primary/40 ring-1 ring-primary/20"
+                    ? "border-primary/40"
                     : "border-border/60",
               )}
             >
               <span
                 className={cn(
-                  "flex size-10 shrink-0 items-center justify-center rounded-xl font-bold",
+                  "flex size-9 shrink-0 items-center justify-center rounded-lg",
                   s.done
-                    ? "bg-chart-3/15 text-chart-3"
+                    ? "bg-muted text-muted-foreground"
                     : s.active
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-primary/10 text-primary"
                       : "bg-muted text-muted-foreground",
                 )}
               >
-                {s.done ? <CheckCircle2 className="size-5" aria-hidden="true" /> : <Icon className="size-5" aria-hidden="true" />}
+                {s.done ? <CheckCircle2 className="size-4.5" aria-hidden="true" /> : <Icon className="size-4.5" aria-hidden="true" />}
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Step {s.n}
-                  {i < 2 && <span className="ml-2 hidden text-border sm:inline">———</span>}
                 </p>
-                <p className="truncate text-sm font-bold">{s.title}</p>
-                <p className="truncate text-xs text-muted-foreground">{s.desc}</p>
+                <p className="text-sm font-semibold leading-snug">{s.title}</p>
+                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{s.desc}</p>
               </div>
-              {s.active && (
-                <span className="absolute -top-2 right-3 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
-                  You are here
-                </span>
-              )}
             </li>
           );
         })}
       </ol>
 
-      {/* ── Profile input + live checklist ──────────────────────── */}
+      {/* ── Profile input + checklist ── */}
       <div className="grid gap-4 lg:grid-cols-5">
-        <Card id="linkedin-form" className="scroll-mt-24 border-primary/25 shadow-card lg:col-span-3">
+        <Card id="linkedin-form" className="scroll-mt-24 shadow-card lg:col-span-3">
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="flex items-start gap-3">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-brand-600/10 text-brand-700 dark:text-brand-300">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                   <LinkedInIcon className="size-5" />
                 </span>
                 <div>
                   <CardTitle className="text-base">{hasProfile ? "Your LinkedIn sections" : "Link your profile in 2 minutes"}</CardTitle>
                   <CardDescription>
-                    Copy-paste the visible sections from LinkedIn. We never log in or scrape — only what you paste
-                    is analysed.
+                    Copy-paste the visible sections from LinkedIn. Only what you paste is analysed.
                     {hasProfile && analysis?.profile?.updatedAt && (
                       <> Last saved {formatDateTime(analysis.profile.updatedAt)}.</>
                     )}
@@ -592,8 +575,8 @@ export default function StudentLinkedInPage() {
                   {formError}
                 </p>
               )}
-              <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-muted/50 p-3">
-                <Button type="submit" size="sm" disabled={saving} className="btn-polish">
+              <div className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/50 p-3">
+                <Button type="submit" size="sm" disabled={saving}>
                   {saving ? (
                     <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                   ) : (
@@ -602,7 +585,7 @@ export default function StudentLinkedInPage() {
                   {saving ? "Analysing…" : hasProfile ? "Save & re-analyse" : "Save and analyse"}
                 </Button>
                 <span className="text-xs text-muted-foreground">
-                  Analysis updates instantly after saving — no waiting.
+                  Analysis updates instantly after saving.
                 </span>
               </div>
             </form>
@@ -666,13 +649,13 @@ export default function StudentLinkedInPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-amber-500/25 bg-gradient-to-br from-amber-500/10 via-card to-card shadow-card">
+          <Card className="shadow-card">
             <CardContent className="flex gap-3 p-4">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                 <Lightbulb className="size-4" aria-hidden="true" />
               </span>
               <div>
-                <p className="text-sm font-bold">No internship yet? No problem.</p>
+                <p className="text-sm font-semibold">No internship yet? No problem.</p>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                   List class projects, hackathons or freelance work under <span className="font-semibold text-foreground">Experience</span> —
                   recruiters count <span className="font-semibold text-foreground">proof</span>, not job titles. One line
@@ -711,12 +694,12 @@ export default function StudentLinkedInPage() {
             ].map((f) => {
               const Icon = f.icon;
               return (
-                <Card key={f.title} className="shadow-card transition hover:shadow-card-hover">
+                <Card key={f.title} className="shadow-card">
                   <CardContent className="p-4">
-                    <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                       <Icon className="size-4" aria-hidden="true" />
                     </span>
-                    <p className="mt-3 text-sm font-bold">{f.title}</p>
+                    <p className="mt-3 text-sm font-semibold">{f.title}</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{f.desc}</p>
                   </CardContent>
                 </Card>
@@ -726,24 +709,18 @@ export default function StudentLinkedInPage() {
         </div>
       ) : (
         <>
-          {/* ── Scores — the heart of the page ── */}
+          {/* ── Scores ── */}
           <div className="grid gap-4 md:grid-cols-2">
-            <Card className="relative overflow-hidden shadow-card transition hover:shadow-card-hover">
-              <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-primary/10 blur-2xl" />
+            <Card className="shadow-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                     <Target className="size-4" aria-hidden="true" />
                   </span>
                   Career match
                   <Badge
                     variant="secondary"
-                    className={cn(
-                      "ml-auto",
-                      match.tone === "green" && "bg-chart-3/15 text-chart-3",
-                      match.tone === "primary" && "bg-primary/10 text-primary",
-                      match.tone === "gold" && "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-                    )}
+                    className="ml-auto"
                   >
                     Grade {match.grade}
                   </Badge>
@@ -773,12 +750,12 @@ export default function StudentLinkedInPage() {
                     {match.hint}
                   </p>
                   {analysis?.hasTarget ? (
-                    <p className="tnum mt-2 text-xs font-bold text-muted-foreground">
+                    <p className="tnum mt-2 text-xs font-semibold text-muted-foreground">
                       {matched.length} of {frameworkTotal} required skills found
                       {frameworkTotal > 0 && ` · ${Math.round((matched.length / frameworkTotal) * 100)}% coverage`}
                     </p>
                   ) : (
-                    <Button size="sm" className="btn-polish mt-3" render={<Link href="/student/careers" />}>
+                    <Button size="sm" className="mt-3" render={<Link href="/student/careers" />}>
                       Choose career
                       <ArrowRight className="size-3.5" aria-hidden="true" />
                     </Button>
@@ -787,11 +764,10 @@ export default function StudentLinkedInPage() {
               </CardContent>
             </Card>
 
-            <Card className="relative overflow-hidden shadow-card transition hover:shadow-card-hover">
-              <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-brand-400/20 blur-2xl" />
+            <Card className="shadow-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600/10 text-brand-700 dark:text-brand-300">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                     <LinkedInIcon className="size-4" />
                   </span>
                   Profile strength
@@ -833,19 +809,18 @@ export default function StudentLinkedInPage() {
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-start gap-3">
-                  <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                     <Sparkles className="size-5" aria-hidden="true" />
                   </span>
                   <div>
                     <CardTitle className="text-base">Skills recruiters can find ({detected.length})</CardTitle>
                     <CardDescription>
-                      Matched against the CareerOS skill catalog — spell skills the way job posts do. “Coding” won&apos;t
-                      match, “Java” will.
+                      Matched against the CareerOS skill catalog — spell skills the way job posts do.
                     </CardDescription>
                   </div>
                 </div>
                 {detected.length > 0 && (
-                  <Badge variant="secondary" className="bg-primary/10 text-primary">
+                  <Badge variant="secondary">
                     {detected.length} found
                   </Badge>
                 )}
@@ -866,7 +841,7 @@ export default function StudentLinkedInPage() {
                     <li key={skill.skillId}>
                       <Badge
                         variant="secondary"
-                        className="border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary transition hover:bg-primary/20"
+                        className="px-2.5 py-1 text-xs font-medium"
                       >
                         {skill.skillName}
                       </Badge>
@@ -877,20 +852,20 @@ export default function StudentLinkedInPage() {
 
               {analysis?.hasTarget ? (
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <div className="rounded-2xl border border-chart-3/25 bg-chart-3/5 p-4 transition hover:shadow-card">
+                  <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-chart-3">
+                      <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
                         <CheckCircle2 className="size-3.5" aria-hidden="true" />
                         Already impressing ({matched.length})
                       </p>
                       {frameworkTotal > 0 && (
-                        <span className="tnum text-[11px] font-bold text-chart-3">
+                        <span className="tnum text-[11px] font-semibold text-muted-foreground">
                           {Math.round((matched.length / frameworkTotal) * 100)}%
                         </span>
                       )}
                     </div>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      Required for {analysis.careerName} — and already visible here. Keep them.
+                      Required for {analysis.careerName} — and already visible here.
                     </p>
                     {matched.length === 0 ? (
                       <p className="mt-2 rounded-xl bg-background/60 p-3 text-xs leading-relaxed text-muted-foreground">
@@ -914,20 +889,20 @@ export default function StudentLinkedInPage() {
                       </ul>
                     )}
                   </div>
-                  <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4 transition hover:shadow-card">
+                  <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                      <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
                         <TrendingUp className="size-3.5" aria-hidden="true" />
-                        Add next to get shortlisted ({missing.length})
+                        Add next ({missing.length})
                       </p>
                       {frameworkTotal > 0 && (
-                        <span className="tnum text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                        <span className="tnum text-[11px] font-semibold text-muted-foreground">
                           +{Math.round((missing.length / frameworkTotal) * 100)}% lift
                         </span>
                       )}
                     </div>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      Required for {analysis.careerName} — each one you add lifts your match score.
+                      Required for {analysis.careerName} — each one lifts your match score.
                     </p>
                     {missing.length === 0 ? (
                       <p className="mt-2 rounded-xl bg-background/60 p-3 text-xs text-muted-foreground">
@@ -946,7 +921,7 @@ export default function StudentLinkedInPage() {
                         ))}
                       </ul>
                     )}
-                    <Button variant="outline" size="sm" className="btn-polish mt-3" render={<Link href="/student/roadmap" />}>
+                    <Button variant="outline" size="sm" className="mt-3" render={<Link href="/student/roadmap" />}>
                       <Route className="size-3.5" aria-hidden="true" />
                       Close these gaps with my roadmap
                       <ArrowRight className="size-3.5" aria-hidden="true" />
@@ -954,15 +929,15 @@ export default function StudentLinkedInPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-muted/30 py-6 text-center">
-                  <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 py-6 text-center">
+                  <span className="flex size-12 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                     <Target className="size-6" aria-hidden="true" />
                   </span>
                   <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
                     Choose a target career to split your skills into <span className="font-semibold text-foreground">matched</span> vs{" "}
                     <span className="font-semibold text-foreground">missing</span> against exactly what employers expect.
                   </p>
-                  <Button size="sm" className="btn-polish" render={<Link href="/student/careers" />}>
+                  <Button size="sm" render={<Link href="/student/careers" />}>
                     Choose career
                     <ArrowRight className="size-4" aria-hidden="true" />
                   </Button>
@@ -971,22 +946,22 @@ export default function StudentLinkedInPage() {
             </CardContent>
           </Card>
 
-          {/* ── CV ↔ LinkedIn trust check ── */}
+          {/* ── CV / LinkedIn agreement ── */}
           <Card className="shadow-card">
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex items-start gap-3">
-                  <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                     <Users className="size-5" aria-hidden="true" />
                   </span>
                   <div>
                     <CardTitle className="text-base">Do your CV and LinkedIn agree?</CardTitle>
                     <CardDescription>
-                      Recruiters open both side by side — mismatches erode trust. Aim for 80%+ overlap.
+                      Recruiters open both side by side. Aim for 80%+ overlap.
                     </CardDescription>
                   </div>
                 </div>
-                <Badge variant="secondary" className={cn(overlapPct >= 60 && "bg-chart-3/15 text-chart-3")}>
+                <Badge variant="secondary">
                   {overlapPct}% agreement
                 </Badge>
               </div>
@@ -1018,36 +993,30 @@ export default function StudentLinkedInPage() {
                 {[
                   {
                     title: `On both (${alsoOnCv.length})`,
-                    hint: "Strongest proof — keep these identical everywhere.",
+                    hint: "Keep these identical everywhere.",
                     items: alsoOnCv,
-                    badge: "bg-chart-3/15 text-chart-3",
-                    box: "border-chart-3/25 bg-chart-3/5",
                     icon: BadgeCheck,
                     empty: "No overlap yet — copy 2–3 skills to both places today.",
                   },
                   {
                     title: `Only on LinkedIn (${onlyOnLinkedIn.length})`,
-                    hint: "Quick win: add these to your CV's Skills section too.",
+                    hint: "Add these to your CV Skills section too.",
                     items: onlyOnLinkedIn,
-                    badge: "bg-primary/10 text-primary",
-                    box: "border-primary/20 bg-primary/5",
                     icon: LinkedInIcon,
                     empty: "Nothing unique here. Good consistency.",
                   },
                   {
                     title: `Only on CV (${onlyOnCv.length})`,
-                    hint: "Quick win: add these to LinkedIn Skills today.",
+                    hint: "Add these to LinkedIn Skills today.",
                     items: onlyOnCv,
-                    badge: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-                    box: "border-amber-500/25 bg-amber-500/5",
                     icon: FileText,
                     empty: "CV and LinkedIn agree. Excellent.",
                   },
                 ].map((col) => {
                   const Icon = col.icon;
                   return (
-                    <div key={col.title} className={cn("rounded-2xl border p-4 transition hover:shadow-card", col.box)}>
-                      <p className="inline-flex items-center gap-1.5 text-xs font-bold">
+                    <div key={col.title} className="rounded-xl border border-border/60 bg-muted/30 p-4">
+                      <p className="inline-flex items-center gap-1.5 text-xs font-semibold">
                         <Icon className="size-3.5" aria-hidden="true" />
                         {col.title}
                       </p>
@@ -1058,7 +1027,7 @@ export default function StudentLinkedInPage() {
                         <ul className="mt-2 flex flex-wrap gap-1.5">
                           {col.items.map((skill) => (
                             <li key={skill.skillId}>
-                              <Badge variant="secondary" className={cn("font-semibold", col.badge)}>
+                              <Badge variant="secondary">
                                 {skill.skillName}
                               </Badge>
                             </li>
@@ -1070,7 +1039,7 @@ export default function StudentLinkedInPage() {
                 })}
               </div>
               {onlyOnCv.length > 0 && (
-                <Button variant="outline" size="sm" className="btn-polish" render={<Link href="/student/cv" />}>
+                <Button variant="outline" size="sm" render={<Link href="/student/cv" />}>
                   Review my CV
                   <ArrowRight className="size-3.5" aria-hidden="true" />
                 </Button>
@@ -1079,36 +1048,36 @@ export default function StudentLinkedInPage() {
           </Card>
 
           {/* ── Action plan ── */}
-          <Card className="overflow-hidden border-primary/25 shadow-card">
-            <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-5 pb-1 pt-5">
+          <Card className="shadow-card">
+            <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-3">
-                  <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                  <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                     <Trophy className="size-5" aria-hidden="true" />
                   </span>
                   <div>
                     <CardTitle className="text-base">Your 30-minute upgrade plan</CardTitle>
-                    <CardDescription>Do these in order — smallest effort first, biggest visibility gain.</CardDescription>
+                    <CardDescription>Do these in order — smallest effort first.</CardDescription>
                   </div>
                 </div>
                 <Badge variant="secondary" className="shrink-0">
                   {strengths.length} strengths · {suggestions.length} ideas
                 </Badge>
               </div>
-            </div>
-            <CardContent className="space-y-4 pt-4">
+            </CardHeader>
+            <CardContent className="space-y-4">
               {nextMoves.length > 0 && (
-                <ol className="relative space-y-2 border-l-2 border-primary/20 pl-0">
+                <ol className="space-y-2">
                   {nextMoves.map((item, index) => (
                     <li
                       key={item}
-                      className="relative ml-5 flex items-start gap-3 rounded-2xl border border-border/50 bg-background/60 p-3 transition hover:border-primary/40 hover:shadow-card"
+                      className="flex items-start gap-3 rounded-xl border border-border/60 bg-muted/30 p-3"
                     >
-                      <span className="absolute -left-[29px] flex size-6 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground ring-4 ring-background">
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
                         {index + 1}
                       </span>
                       <div className="min-w-0">
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                           Move {index + 1} · ~10 min
                         </p>
                         <p className="mt-0.5 text-sm leading-relaxed">{item}</p>
@@ -1118,8 +1087,8 @@ export default function StudentLinkedInPage() {
                 </ol>
               )}
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-chart-3/25 bg-chart-3/5 p-4">
-                  <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-chart-3">
+                <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide">
                     <Award className="size-3.5" aria-hidden="true" />
                     What&apos;s working
                   </p>
@@ -1138,8 +1107,8 @@ export default function StudentLinkedInPage() {
                     </ul>
                   )}
                 </div>
-                <div className="rounded-2xl border border-border/60 bg-background/40 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {nextMoves.length > 0 ? "More ideas for later" : "Suggested improvements"}
                   </p>
                   {(nextMoves.length > 0 ? laterIdeas : suggestions).length === 0 ? (
@@ -1163,11 +1132,11 @@ export default function StudentLinkedInPage() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" className="btn-polish" render={<Link href="/student/roadmap" />}>
+                <Button size="sm" render={<Link href="/student/roadmap" />}>
                   <Route className="size-3.5" aria-hidden="true" />
                   Follow my learning plan
                 </Button>
-                <Button size="sm" variant="outline" className="btn-polish" render={<Link href="/student/cv" />}>
+                <Button size="sm" variant="outline" render={<Link href="/student/cv" />}>
                   <FileText className="size-3.5" aria-hidden="true" />
                   Check my CV too
                 </Button>
@@ -1175,7 +1144,7 @@ export default function StudentLinkedInPage() {
             </CardContent>
           </Card>
 
-          {/* ── Recruiter tips strip ── */}
+          {/* ── Tips ── */}
           <div className="grid gap-3 sm:grid-cols-3">
             {[
               {
@@ -1198,12 +1167,12 @@ export default function StudentLinkedInPage() {
               return (
                 <div
                   key={t.title}
-                  className="rounded-2xl border border-border/60 bg-card p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover"
+                  className="rounded-xl border border-border/60 bg-card p-4 shadow-card"
                 >
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-brand-600/10 text-brand-700 dark:text-brand-300">
+                  <span className="flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                     <Icon className="size-4" aria-hidden="true" />
                   </span>
-                  <p className="mt-2.5 text-sm font-bold">{t.title}</p>
+                  <p className="mt-2.5 text-sm font-semibold">{t.title}</p>
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{t.desc}</p>
                 </div>
               );
