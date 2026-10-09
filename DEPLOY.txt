@@ -14,9 +14,11 @@ CODEIT CareerOS — deploy from this zip (run these ON THE SERVER)
    - create backend.env and generate secrets on first run (never share it),
    - rebuild the frontend so browsers use your own domain for /api
      (this fixes "Unable to reach the server" on register/login),
-   - create the database tables on an empty database only
+   - create the database tables AND starter content (careers, skills,
+     assessments, roadmaps, projects) on an empty database only
      (existing data is never changed),
-   - start everything and check the backend is healthy.
+   - use persisted local file storage when no S3 bucket is configured,
+     so CV upload/analysis and profile photos work too.
 
 3. Keep your existing HTTPS setup pointing at port 3000 (unchanged).
 

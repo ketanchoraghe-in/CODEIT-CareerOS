@@ -31,6 +31,10 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/${DB_NAME:-careeros}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&connectionTimeZone=UTC
+    volumes:
+      # Persisted upload store for CV files + profile photos when CV_STORAGE=local
+      # (deploy-prod.sh default without a real S3 bucket). Survives rebuilds.
+      - upload-data:/data
     ports:
       - "8080:8080"
     depends_on:
@@ -55,3 +59,4 @@ services:
 
 volumes:
   mysql-data:
+  upload-data:

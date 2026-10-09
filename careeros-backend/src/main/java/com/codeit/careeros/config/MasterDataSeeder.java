@@ -40,19 +40,21 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Seeds the dev database with the skill master, the career master with its
+ * Seeds the database with the skill master, the career master with its
  * competency framework, and example assessments (docs sections 10-12 and 14),
  * plus Sprint 4 roadmap phases/steps and recommended projects generated from
  * each career's own competency framework.
- * Idempotent: the first seed runs only once (guarded by the presence of
- * skills); later catalog expansions are backfilled by name, and
- * assessments and roadmaps/projects are backfilled independently
- * (only missing rows are inserted). Never runs in the test profile so
- * integration tests stay hermetic.
+ * Runs in dev always, and in prod ONLY to fill an empty catalog (first
+ * deploy): the first seed runs only when no skills exist, and later runs
+ * insert only catalog rows that are still missing (matched by name).
+ * Idempotent: existing careers, skills, assessments, roadmaps, projects,
+ * users and attempts are never modified or deleted, and restarts insert
+ * nothing twice. Never runs in the test profile so integration tests stay
+ * hermetic.
  */
 @Slf4j
 @Component
-@Profile("dev")
+@Profile({"dev", "prod"})
 @RequiredArgsConstructor
 public class MasterDataSeeder implements ApplicationRunner {
 

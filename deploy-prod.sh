@@ -99,6 +99,17 @@ fi
 # Always align these with the real public host (the core fix).
 set_kv "CORS_ALLOWED_ORIGINS" "$FRONTEND_ORIGIN"
 set_kv "SPRING_PROFILES_ACTIVE" "prod"
+
+# File uploads: S3 needs a real bucket + credentials. Without one, use the
+# persisted local volume (/data, see docker-compose.prod.yml) so CV upload /
+# analysis / download and profile photos work out of the box.
+BUCKET="$(grep "^CV_S3_BUCKET=" "$ENV_FILE" | cut -d= -f2- || true)"
+if [ -z "$BUCKET" ] || [[ "$BUCKET" == *"your-careeros-cv-bucket"* ]] || [[ "$BUCKET" == *"CHANGE_ME"* ]]; then
+  set_kv "CV_STORAGE" "local"
+  set_kv "CV_LOCAL_DIR" "/data/cv-storage"
+  set_kv "PROFILE_PHOTO_DIR" "/data/profile-photos"
+  echo "No S3 bucket configured: using persisted local upload storage."
+fi
 if ! grep -q "^ADMIN_EMAIL=" "$ENV_FILE"; then
   set_kv "ADMIN_EMAIL" "admin@careeros.local"
 fi
