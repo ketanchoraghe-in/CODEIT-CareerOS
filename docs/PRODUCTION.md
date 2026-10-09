@@ -129,7 +129,11 @@ Build arg: `NEXT_PUBLIC_API_URL=https://api.example.com`.
 2. Apply schema (validated migrations, `JPA_DDL_AUTO=validate`).
 3. Create `backend.env` from `.env.example` (strong `JWT_SECRET`, real DB creds, exact CORS origins).
 4. First boot creates the admin from `ADMIN_EMAIL/ADMIN_PASSWORD` only if no users exist; rotate afterwards.
-5. `docker compose -f docker-compose.prod.yml up -d --build`.
+5. `./deploy-prod.sh <public-host-or-ip>` from the repo root (recommended —
+   creates `backend.env`, generates first-run secrets, aligns
+   `FRONTEND_API_URL`/`CORS_ALLOWED_ORIGINS`, bootstraps an empty DB once,
+   rebuilds and health-checks). Manual equivalent:
+   `docker compose -f docker-compose.prod.yml up -d --build`.
 6. Verify: `GET /actuator/health` → `{"status":"UP"}` (no details exposed), login flow, key student pages.
 7. Confirm Swagger is off in prod (`springdoc … enabled: false`).
 

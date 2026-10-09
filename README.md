@@ -68,6 +68,18 @@ Local AI walkthrough: `careeros-backend/.env.example`.
 
 ## Production deployment (Docker)
 
+Easiest — one command on the server (from the repo root):
+
+```bash
+./deploy-prod.sh 13.201.83.135
+```
+
+It creates `backend.env` (generating secrets on first run), points the
+frontend build and backend CORS at your public host, bootstraps the schema
+on an empty database only, then builds and health-checks everything.
+
+Manual equivalent:
+
 ```powershell
 cp .env.example backend.env   # fill in real values (never commit)
 docker compose -f docker-compose.prod.yml up -d --build

@@ -1,0 +1,4 @@
+# Keep default checkout behavior, but shell scripts must always use LF
+# or their shebang breaks on Linux.
+* text=auto
+*.sh text eol=lf
