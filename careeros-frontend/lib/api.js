@@ -99,6 +99,9 @@ api.interceptors.response.use(
       message = "The request timed out. Please try again.";
     } else if (!error.response) {
       message = "Unable to reach the server. Check your connection.";
+      if (typeof window !== "undefined" && process.env.NODE_ENV !== "production") {
+        console.error("[api] no response:", error?.code, original?.url, error?.message);
+      }
     }
 
     throw new ApiError(message, {

@@ -29,11 +29,12 @@ function setCookie(name, value) {
 }
 
 function clearCookie(name) {
-  document.cookie = `${name}=; path=/; SameSite=Lax; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+  document.cookie = `${name}=; path=/; SameSite=Lax; expires=Thu, 01 Jan 1970 00:00:00 GMT${cookieSecureFlag()}`;
 }
 
 export const auth = {
   save({ accessToken, refreshToken, user }) {
+    if (typeof window === "undefined") return;
     localStorage.setItem(ACCESS_KEY, accessToken);
     if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
     if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));

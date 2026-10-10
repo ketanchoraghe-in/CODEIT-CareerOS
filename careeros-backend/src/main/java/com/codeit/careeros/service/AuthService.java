@@ -66,6 +66,7 @@ public class AuthService {
                 .user(user)
                 .studentId(generateStudentId(user))
                 .fullName(user.getFullName())
+                .mobile(request.mobile().trim())
                 .semester(1)
                 .build();
         studentProfileRepository.save(profile);
