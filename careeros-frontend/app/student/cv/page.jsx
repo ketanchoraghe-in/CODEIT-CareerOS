@@ -541,6 +541,11 @@ export default function StudentCvPage() {
                             </div>
                             <p className="mt-3 text-sm font-bold">{section.title}</p>
                             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{section.note}</p>
+                            {section.evidence ? (
+                              <p className="mt-2 truncate text-[11px] italic leading-relaxed text-muted-foreground/80" title={section.evidence}>
+                                “{section.evidence}”
+                              </p>
+                            ) : null}
                           </li>
                         );
                       })}
