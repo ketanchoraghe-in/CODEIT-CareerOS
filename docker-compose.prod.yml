@@ -51,6 +51,10 @@ services:
         # API + CORS then — not recommended).
         API_PROXY_URL: http://backend:8080
         NEXT_PUBLIC_API_URL: ${FRONTEND_API_URL:-}
+        # Google Sign-In button (baked at build time). deploy-prod.sh exports
+        # GOOGLE_CLIENT_ID from backend.env, so setting it there enables both
+        # backend verification and the frontend button. Empty = button hidden.
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     restart: unless-stopped
     ports:
       - "3000:3000"

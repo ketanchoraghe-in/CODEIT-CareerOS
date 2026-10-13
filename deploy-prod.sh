@@ -142,6 +142,19 @@ else
   fi
 fi
 
+# Google Sign-In sanity check (non-blocking): the backend verifies ID tokens
+# against GOOGLE_CLIENT_ID and the frontend bakes the same value in at build
+# time (NEXT_PUBLIC_GOOGLE_CLIENT_ID, see docker-compose.prod.yml). Empty on
+# either side means email/password-only — the site still works, the Google
+# button just stays hidden. After ADDING a client ID, rebuild the frontend:
+#   docker compose -f $COMPOSE_FILE up -d --build frontend
+GOOGLE_CLIENT_ID_VAL="$(grep "^GOOGLE_CLIENT_ID=" "$ENV_FILE" | cut -d= -f2- | tr -d '[:space:]' || true)"
+if [ -z "$GOOGLE_CLIENT_ID_VAL" ]; then
+  echo "NOTE: GOOGLE_CLIENT_ID is empty in $ENV_FILE — Google Sign-In stays disabled."
+  echo "  Set GOOGLE_CLIENT_ID=<your-client-id>.apps.googleusercontent.com in $ENV_FILE"
+  echo "  and add your domain under Authorized JavaScript origins in Google Cloud Console."
+fi
+
 # --- 2. Start MySQL first (so we can inspect it before booting the API) --------
 echo "Starting MySQL ..."
 docker compose -f "$COMPOSE_FILE" up -d mysql
