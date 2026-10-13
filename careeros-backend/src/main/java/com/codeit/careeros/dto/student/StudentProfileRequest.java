@@ -14,7 +14,7 @@ public record StudentProfileRequest(
         String fullName,
 
         @Size(max = 20, message = "Mobile must be at most 20 characters")
-        @Pattern(regexp = "^$|^[0-9+\\- ]{6,20}$", message = "Mobile number is invalid")
+        @Pattern(regexp = "^$|^[6-9][0-9]{9}$", message = "Mobile must be a 10-digit number starting with 6, 7, 8 or 9")
         String mobile,
 
         LocalDate dateOfBirth,

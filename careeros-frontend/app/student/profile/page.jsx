@@ -152,16 +152,23 @@ export default function ProfilePage() {
     load();
   }, [load]);
 
+  // Indian mobile numbers: exactly 10 digits, starting with 6, 7, 8 or 9.
   function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name } = e.target;
+    let value = e.target.value;
+    if (name === "mobile") {
+      value = value.replace(/\D/g, "").slice(0, 10);
+    }
+    setForm({ ...form, [name]: value });
     setDirty(true);
-    if (fieldErrors[e.target.name]) setFieldErrors((prev) => ({ ...prev, [e.target.name]: undefined }));
+    if (fieldErrors[name]) setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
   }
 
   function validate() {
     const errors = {};
     if (!form.fullName.trim()) errors.fullName = "Full name is required";
-    if (form.mobile && !/^[0-9+\- ]{6,20}$/.test(form.mobile.trim())) errors.mobile = "Enter a valid mobile number";
+    if (form.mobile.trim() && !/^[6-9][0-9]{9}$/.test(form.mobile.trim()))
+      errors.mobile = "Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9";
     if (form.graduationYear) {
       const year = Number(form.graduationYear);
       if (!Number.isInteger(year) || year < 2000 || year > 2100) errors.graduationYear = "Enter a valid graduation year";
@@ -420,7 +427,7 @@ export default function ProfilePage() {
               </Field>
               <Field id="mobile" label="Mobile" error={fieldErrors.mobile}>
                 {(inputId) => (
-                  <Input id={inputId} name="mobile" type="tel" className="h-10 px-3" value={form.mobile} onChange={handleChange} aria-invalid={Boolean(fieldErrors.mobile)} />
+                  <Input id={inputId} name="mobile" type="tel" inputMode="numeric" maxLength={10} placeholder="9876543210" className="h-10 px-3" value={form.mobile} onChange={handleChange} aria-invalid={Boolean(fieldErrors.mobile)} />
                 )}
               </Field>
               <Field id="dateOfBirth" label="Date of birth">

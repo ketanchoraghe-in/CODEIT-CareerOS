@@ -11,6 +11,7 @@ import { AuthSplit } from "@/components/auth/auth-split";
 import { Field } from "@/components/field";
 import api from "@/lib/api";
 import { auth } from "@/lib/auth";
+import { GoogleSignInButton } from "@/components/auth/google-signin";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -129,6 +130,8 @@ export default function LoginPage() {
             "Sign in"
           )}
         </Button>
+
+        <GoogleSignInButton mode="signin" onError={setError} />
 
         <p className="text-center text-xs text-muted-foreground sm:hidden">
           New to CareerOS?{" "}

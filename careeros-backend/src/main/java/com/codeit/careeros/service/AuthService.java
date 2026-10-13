@@ -42,6 +42,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final GoogleTokenVerifier googleTokenVerifier;
 
     @Value("${app.jwt.refresh-expiration-ms:604800000}")
     private long refreshExpirationMs;
@@ -84,6 +85,47 @@ public class AuthService {
                 .orElseThrow(() -> BusinessException.forbidden("Account is disabled"));
         log.info("Logged in user {} ({})", user.getEmail(), user.getId());
         return issueTokens(user);
+    }
+
+    /**
+     * Sign in (or auto-register) with a Google ID token verified server-side.
+     * Existing email accounts are linked automatically; new Google users get a
+     * STUDENT account with a random unusable password hash (password login
+     * stays disabled for them — they must keep using Google).
+     */
+    @Transactional
+    public AuthResponse googleLogin(String idToken) {
+        GoogleTokenVerifier.VerifiedGoogleUser googleUser = googleTokenVerifier.verify(idToken);
+        String email = googleUser.email();
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            user = User.builder()
+                    .email(email)
+                    .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString() + "-google-oauth"))
+                    .fullName(truncate(googleUser.fullName(), 120))
+                    .role(Role.STUDENT)
+                    .status(UserStatus.ACTIVE)
+                    .build();
+            user = userRepository.save(user);
+            StudentProfile profile = StudentProfile.builder()
+                    .user(user)
+                    .studentId(generateStudentId(user))
+                    .fullName(user.getFullName())
+                    .semester(1)
+                    .build();
+            studentProfileRepository.save(profile);
+            log.info("Registered student via Google {} ({})", user.getEmail(), user.getId());
+        } else {
+            log.info("Logged in user via Google {} ({})", user.getEmail(), user.getId());
+        }
+        return issueTokens(user);
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null) return "Student";
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) return "Student";
+        return trimmed.length() <= max ? trimmed : trimmed.substring(0, max);
     }
 
     @Transactional

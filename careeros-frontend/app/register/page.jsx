@@ -11,6 +11,7 @@ import { AuthSplit } from "@/components/auth/auth-split";
 import { Field } from "@/components/field";
 import api from "@/lib/api";
 import { auth } from "@/lib/auth";
+import { GoogleSignInButton } from "@/components/auth/google-signin";
 import { cn } from "cn";
 
 function passwordScore(password) {
@@ -35,6 +36,10 @@ const inputShell = (hasError) =>
     hasError && "border-destructive/60 bg-destructive/[0.03] focus-visible:border-destructive focus-visible:ring-destructive/15",
   );
 
+// Indian mobile numbers: exactly 10 digits, starting with 6, 7, 8 or 9.
+const MOBILE_PATTERN = /^[6-9][0-9]{9}$/;
+const MOBILE_ERROR = "Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9";
+
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({ fullName: "", email: "", mobile: "", password: "" });
@@ -51,7 +56,7 @@ export default function RegisterPage() {
     if (!form.fullName.trim()) errors.fullName = "Please enter your full name";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors.email = "Enter a valid email address";
     if (!form.mobile.trim()) errors.mobile = "Mobile number is required";
-    else if (!/^[0-9+\- ]{6,20}$/.test(form.mobile.trim())) errors.mobile = "Enter a valid mobile number";
+    else if (!MOBILE_PATTERN.test(form.mobile.trim())) errors.mobile = MOBILE_ERROR;
     if (!form.password) errors.password = "Create a password to continue";
     else if (form.password.length < 8 || !/[A-Za-z]/.test(form.password) || !/\d/.test(form.password))
       errors.password = "Use 8+ characters with both letters and digits";
@@ -60,9 +65,25 @@ export default function RegisterPage() {
   }
 
   function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    if (fieldErrors[e.target.name]) {
-      setFieldErrors((prev) => ({ ...prev, [e.target.name]: undefined }));
+    const { name } = e.target;
+    let value = e.target.value;
+    if (name === "mobile") {
+      // Numeric-friendly: strip non-digits and cap at 10 digits (enforced
+      // here, not just via maxLength, so pastes are sanitized too).
+      value = value.replace(/\D/g, "").slice(0, 10);
+    }
+    setForm({ ...form, [name]: value });
+    if (fieldErrors[name]) {
+      // Re-validate while typing; an emptied field shows no error until submit.
+      if (name === "mobile") {
+        if (!value.trim() || MOBILE_PATTERN.test(value.trim())) {
+          setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
+        } else {
+          setFieldErrors((prev) => ({ ...prev, [name]: MOBILE_ERROR }));
+        }
+      } else {
+        setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
+      }
     }
   }
 
@@ -161,7 +182,7 @@ export default function RegisterPage() {
               {(inputId) => (
                 <div className="relative">
                   <Phone className={cn("pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2", fieldErrors.mobile ? "text-destructive/70" : "text-muted-foreground")} aria-hidden="true" />
-                  <Input id={inputId} name="mobile" type="tel" autoComplete="tel" placeholder="98765 43210" className={inputShell(fieldErrors.mobile)} value={form.mobile} onChange={handleChange} aria-invalid={Boolean(fieldErrors.mobile)} />
+                  <Input id={inputId} name="mobile" type="tel" autoComplete="tel" inputMode="numeric" pattern="[6-9][0-9]{9}" maxLength={10} placeholder="9876543210" className={inputShell(fieldErrors.mobile)} value={form.mobile} onChange={handleChange} aria-invalid={Boolean(fieldErrors.mobile)} />
                 </div>
               )}
             </Field>
@@ -213,6 +234,8 @@ export default function RegisterPage() {
             <span className="inline-flex items-center gap-1.5"><BadgeCheck className="size-3.5 text-brand-600" aria-hidden="true" />No credit card</span>
           </div>
         </div>
+
+        <GoogleSignInButton mode="signup" onError={setError} />
 
         <p className="text-center text-xs text-muted-foreground sm:hidden">
           Already have an account?{" "}

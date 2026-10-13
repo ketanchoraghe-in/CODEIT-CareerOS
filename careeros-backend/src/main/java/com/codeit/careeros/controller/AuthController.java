@@ -2,6 +2,7 @@ package com.codeit.careeros.controller;
 
 import com.codeit.careeros.common.ApiResponse;
 import com.codeit.careeros.dto.auth.AuthResponse;
+import com.codeit.careeros.dto.auth.GoogleLoginRequest;
 import com.codeit.careeros.dto.auth.LoginRequest;
 import com.codeit.careeros.dto.auth.RefreshRequest;
 import com.codeit.careeros.dto.auth.RegisterRequest;
@@ -38,6 +39,12 @@ public class AuthController {
     @PostMapping("/login")
     public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.success("Login successful", authService.login(request));
+    }
+
+    @Operation(summary = "Sign in or sign up with a Google ID token (Google Identity Services)")
+    @PostMapping("/google")
+    public ApiResponse<AuthResponse> google(@Valid @RequestBody GoogleLoginRequest request) {
+        return ApiResponse.success("Google sign-in successful", authService.googleLogin(request.idToken()));
     }
 
     @Operation(summary = "Refresh access token using a refresh token")

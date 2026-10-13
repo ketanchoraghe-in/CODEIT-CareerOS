@@ -2,6 +2,7 @@ package com.codeit.careeros.dto.auth;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import com.codeit.careeros.validation.StrongPassword;
 
@@ -16,7 +17,7 @@ public record RegisterRequest(
         String email,
 
         @NotBlank(message = "Mobile number is required")
-        @Size(max = 20, message = "Mobile must be at most 20 characters")
+        @Pattern(regexp = "^[6-9][0-9]{9}$", message = "Mobile must be a 10-digit number starting with 6, 7, 8 or 9")
         String mobile,
 
         @NotBlank(message = "Password is required")
