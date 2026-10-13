@@ -14,6 +14,12 @@ public class BusinessException extends RuntimeException {
         this.httpStatus = httpStatus;
     }
 
+    public BusinessException(ErrorCode errorCode, String message, int httpStatus, Throwable cause) {
+        super(message, cause);
+        this.errorCode = errorCode;
+        this.httpStatus = httpStatus;
+    }
+
     public static BusinessException notFound(String message) {
         return new BusinessException(ErrorCode.NOT_FOUND, message, 404);
     }
@@ -44,5 +50,15 @@ public class BusinessException extends RuntimeException {
 
     public static BusinessException aiError(String message) {
         return new BusinessException(ErrorCode.AI_ERROR, message, 502);
+    }
+
+    /**
+     * Provider failure with the original cause preserved (for retry
+     * classification and sanitized server-side logging). The cause never
+     * reaches the API response: {@code GlobalExceptionHandler} only renders
+     * {@code getMessage()}, which must stay user-safe.
+     */
+    public static BusinessException aiError(String message, Throwable cause) {
+        return new BusinessException(ErrorCode.AI_ERROR, message, 502, cause);
     }
 }

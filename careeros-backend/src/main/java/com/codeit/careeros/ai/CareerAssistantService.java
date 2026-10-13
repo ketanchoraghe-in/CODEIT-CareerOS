@@ -224,8 +224,9 @@ public class CareerAssistantService {
             // Provider outage / timeout (502) falls back to grounded offline
             // guidance instead of leaving the student with an error bubble.
             if (ex.getErrorCode() == ErrorCode.AI_ERROR && aiProperties.isOfflineFallbackEnabled()) {
-                log.warn("LLM provider failed ({}), falling back to offline guidance",
-                        ex.getMessage());
+                log.warn("LLM provider failed (provider={} model={} error={}), falling back to offline guidance",
+                        aiProperties.getProvider(), aiProperties.effectiveModel(),
+                        sanitizeForLog(ex.getMessage()));
                 return offlineReply(session.getId(), userId, text, true);
             }
             throw ex;
@@ -403,6 +404,8 @@ public class CareerAssistantService {
 
     private AssistantMessage callModel(List<Message> prompt, ChatOptions toolOptions) {
         int timeoutSeconds = Math.max(1, Math.min(300, aiProperties.getRequestTimeoutSeconds()));
+        int maxRetries = Math.max(0, Math.min(3, aiProperties.getMaxRetries()));
+        long baseBackoffMillis = Math.max(0, Math.min(10_000, aiProperties.getRetryBackoffMillis()));
         List<Message> snapshot = List.copyOf(prompt);
         ChatModel activeModel;
         try {
@@ -413,6 +416,38 @@ public class CareerAssistantService {
             log.warn("AI model resolution failed: {}", ex.getClass().getSimpleName());
             throw BusinessException.aiError("AI service is temporarily unavailable. Please try again.");
         }
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return attemptModelCall(activeModel, snapshot, toolOptions, timeoutSeconds);
+            } catch (BusinessException ex) {
+                // Only transient provider signals (HTTP 429/503/500/502/504,
+                // overload, timeouts) are retried, and only up to maxRetries.
+                // Auth/model errors (401/403/404) and empty responses fail fast.
+                if (attempt >= maxRetries || !isTransientProviderError(ex)) {
+                    throw ex;
+                }
+                long delay = backoffDelayMillis(baseBackoffMillis, attempt);
+                log.warn("AI provider transient failure (attempt {}/{}): provider={} model={} error={}. Retrying in {}ms.",
+                        attempt + 1, maxRetries + 1,
+                        aiProperties.getProvider(), aiProperties.effectiveModel(),
+                        sanitizeForLog(ex.getMessage()), delay);
+                sleepUninterruptibly(delay);
+            }
+        }
+    }
+
+    /**
+     * One provider call guarded by the per-call wall-clock budget from
+     * {@code AI_REQUEST_TIMEOUT_SECONDS}. The backend Future timeout is the
+     * primary guard (the underlying Spring AI HTTP client has no stricter
+     * default); the frontend AI call budget (150s) stays above a single
+     * backend attempt so normal turns settle before the browser aborts.
+     * For deployments with retries enabled, set
+     * {@code AI_REQUEST_TIMEOUT_SECONDS=45} so
+     * {@code (maxRetries + 1) * timeout + backoff} stays under ~150s.
+     */
+    private AssistantMessage attemptModelCall(ChatModel activeModel, List<Message> snapshot,
+            ChatOptions toolOptions, int timeoutSeconds) {
         // Tools execute in the request thread (see executeNativeTool), but a
         // provider model could theoretically run callbacks inline — propagate
         // the student's security context so identity never goes missing.
@@ -438,17 +473,145 @@ public class CareerAssistantService {
             throw ex;
         } catch (TimeoutException ex) {
             future.cancel(true);
-            log.warn("AI provider call timed out after {}s", timeoutSeconds);
-            throw BusinessException.aiError("AI provider timed out. Please try again.");
+            log.warn("AI provider call timed out after {}s (provider={} model={})",
+                    timeoutSeconds, aiProperties.getProvider(), aiProperties.effectiveModel());
+            throw BusinessException.aiError("AI provider timed out. Please try again.", ex);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             future.cancel(true);
-            throw BusinessException.aiError("AI service is temporarily unavailable. Please try again.");
+            throw BusinessException.aiError("AI service is temporarily unavailable. Please try again.", ex);
         } catch (Exception ex) {
             future.cancel(true);
-            log.warn("AI provider call failed: {}", ex.getClass().getSimpleName());
-            throw BusinessException.aiError(safeProviderMessage(ex));
+            // Spring AI wraps the HTTP failure (e.g. Gemini 503/429/404) in
+            // ExecutionException/RuntimeException chains — log the sanitized
+            // chain so the real status is visible without leaking keys.
+            log.warn("AI provider call failed: provider={} model={} error={} cause={}",
+                    aiProperties.getProvider(), aiProperties.effectiveModel(),
+                    ex.getClass().getSimpleName(), sanitizeForLog(combinedChainMessage(ex)));
+            throw BusinessException.aiError(safeProviderMessage(ex), ex);
         }
+    }
+
+    /**
+     * True only for retryable transient signals: HTTP 429/500/502/503/504,
+     * overload/timeout markers from the ORIGINAL provider cause chain. Auth
+     * (401/403), unknown-model (400/404 "model not found") and empty responses
+     * are NOT retried.
+     *
+     * <p>Classification inspects the preserved cause chain (Spring AI wraps the
+     * Gemini HTTP status in ExecutionException/RuntimeException layers), never
+     * the sanitized user-facing top message — so a generic "temporarily
+     * unavailable" safe message alone never triggers a retry storm.
+     */
+    boolean isTransientProviderError(BusinessException ex) {
+        String top = String.valueOf(ex.getMessage()).toLowerCase();
+        // Timeout path ("AI provider timed out...") is always retryable.
+        if (top.contains("timed out") || top.contains("timeout")) {
+            return true;
+        }
+        // Fail fast on sanitized non-retryable outcomes.
+        if (top.contains("empty response")
+                || top.contains("configured ai model is unavailable")
+                || top.contains("invalid credentials")) {
+            return false;
+        }
+        Throwable cause = ex.getCause();
+        if (cause == null) {
+            return false;
+        }
+        String raw = combinedChainMessage(cause).toLowerCase();
+        if (raw.isBlank()) {
+            return false;
+        }
+        // Fail fast: credentials and model configuration will not heal on retry.
+        if (raw.contains("unauthorized") || raw.contains("invalid api key")
+                || raw.contains("incorrect api key") || raw.contains("api key not valid")
+                || raw.contains("unauthenticated") || raw.contains("permission denied")
+                || raw.contains(" 401") || raw.contains(" 403")
+                || raw.contains("api key expired") || raw.contains("api_key_invalid")) {
+            return false;
+        }
+        if ((raw.contains("model") || raw.contains("models/"))
+                && (raw.contains("not found") || raw.contains("does not exist")
+                        || raw.contains("not_found") || raw.contains(" 404"))) {
+            return false;
+        }
+        return raw.contains(" 429") || raw.contains(" 500") || raw.contains(" 502")
+                || raw.contains(" 503") || raw.contains(" 504")
+                || raw.contains("rate limit") || raw.contains("rate-limit")
+                || raw.contains("quota") || raw.contains("resource exhausted")
+                || raw.contains("resource_exhausted") || raw.contains("overloaded")
+                || raw.contains("unavailable") || raw.contains("temporarily overloaded")
+                || raw.contains("timeout") || raw.contains("timed out")
+                || raw.contains("deadline exceeded") || raw.contains("try again")
+                || raw.contains("socket timeout") || raw.contains("read timed out")
+                || raw.contains("connection reset") || raw.contains("service unavailable");
+    }
+
+    /** Exponential backoff: base * 2^attempt plus jitter, capped at 10s. */
+    long backoffDelayMillis(long baseMillis, int attempt) {
+        if (baseMillis <= 0) {
+            return 0;
+        }
+        long exponential = baseMillis * (1L << Math.min(attempt, 4));
+        long capped = Math.min(exponential, 10_000L);
+        long jitter = (long) (Math.random() * Math.min(baseMillis, 500L));
+        return Math.min(capped + jitter, 10_500L);
+    }
+
+    private void sleepUninterruptibly(long millis) {
+        if (millis <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Full cause-chain message (top + all causes), truncated for logging. */
+    private String combinedChainMessage(Throwable ex) {
+        StringBuilder sb = new StringBuilder();
+        java.util.HashSet<Throwable> seen = new java.util.HashSet<>();
+        Throwable current = ex;
+        while (current != null && seen.add(current)) {
+            String message = current.getMessage();
+            if (message != null && !message.isBlank()) {
+                if (sb.length() > 0) {
+                    sb.append(" | caused by ").append(current.getClass().getSimpleName()).append(": ");
+                }
+                sb.append(message);
+                if (sb.length() > 2000) {
+                    break;
+                }
+            }
+            current = current.getCause();
+        }
+        String combined = sb.toString();
+        return combined.length() <= 2000 ? combined : combined.substring(0, 2000);
+    }
+
+    /**
+     * Redacts key-like tokens (AIza…, sk-…, Bearer …, key=…) and URLs with
+     * query secrets before logging, then truncates. Never used for user
+     * messages — logging only.
+     */
+    private String sanitizeForLog(String value) {
+        if (value == null || value.isBlank()) {
+            return "no-detail";
+        }
+        String redacted = value
+                .replaceAll("AIza[0-9A-Za-z\\-_]{10,}", "AIza-REDACTED")
+                .replaceAll("sk-[A-Za-z0-9\\-_]{5,}", "sk-REDACTED")
+                .replaceAll("(?i)bearer\\s+[A-Za-z0-9\\-_.~+/=]+", "Bearer REDACTED")
+                .replaceAll("(?i)(api[_-]?key\\s*[:=]\\s*)[^\\s,}]+", "$1REDACTED")
+                .replaceAll("(?i)(key\\s*=\\s*)[^\\s,}]+", "$1REDACTED")
+                .replaceAll("token=[^\\s&}]+", "token=REDACTED");
+        if (redacted.length() > 500) {
+            return redacted.substring(0, 500) + "…";
+        }
+        return redacted;
     }
 
     /** Sliding-window per-student guard: HTTP 429 instead of unbounded spend. */
@@ -473,9 +636,12 @@ public class CareerAssistantService {
     /**
      * Maps raw provider exceptions to user-safe messages without leaking
      * internals (no class names, URLs, keys, or stack details).
+     * Inspects the full cause chain: Spring AI wraps the Gemini HTTP status
+     * (e.g. 503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED, 404 model not found)
+     * inside ExecutionException/RuntimeException layers.
      */
     private String safeProviderMessage(Exception ex) {
-        String raw = String.valueOf(ex.getMessage()).toLowerCase();
+        String raw = combinedChainMessage(ex).toLowerCase();
         if (raw.contains("unauthorized") || raw.contains("invalid api key")
                 || raw.contains("incorrect api key") || raw.contains("api key not valid")
                 || raw.contains("api-key") || raw.contains("apikey")
@@ -486,6 +652,11 @@ public class CareerAssistantService {
         }
         if (raw.contains("model") && (raw.contains("not found") || raw.contains("does not exist"))) {
             return "The configured AI model is unavailable. An administrator should check AI_MODEL.";
+        }
+        if (raw.contains(" 503") || raw.contains("overloaded") || raw.contains("unavailable")
+                || raw.contains("service unavailable") || raw.contains(" 500") || raw.contains(" 502")
+                || raw.contains(" 504")) {
+            return "AI service is temporarily overloaded. Please wait a moment and try again.";
         }
         if (raw.contains("429") || raw.contains("rate limit") || raw.contains("quota")
                 || raw.contains("resource exhausted") || raw.contains("resource_exhausted")) {

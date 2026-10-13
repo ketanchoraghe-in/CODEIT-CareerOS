@@ -114,6 +114,34 @@ if ! grep -q "^ADMIN_EMAIL=" "$ENV_FILE"; then
   set_kv "ADMIN_EMAIL" "admin@careeros.local"
 fi
 
+# AI sanity check (non-blocking, never prints secrets): the deploy script
+# provisions JWT/DB/admin secrets above but AI keys must be set by hand.
+# A missing key is the usual "chat says it cannot reach the AI provider"
+# cause: the backend then runs unconfigured (503 AI_NOT_CONFIGURED or the
+# offline Smart-Guidance fallback) while localhost works fine.
+AI_PROVIDER_VAL="$(grep "^AI_PROVIDER=" "$ENV_FILE" | cut -d= -f2- | tr -d '[:space:]' || true)"
+AI_API_KEY_VAL="$(grep "^AI_API_KEY=" "$ENV_FILE" | cut -d= -f2- || true)"
+GEMINI_API_KEY_VAL="$(grep "^GEMINI_API_KEY=" "$ENV_FILE" | cut -d= -f2- || true)"
+GEMINI_MODEL_VAL="$(grep "^GEMINI_MODEL=" "$ENV_FILE" | cut -d= -f2- | tr -d '[:space:]' || true)"
+AI_MODEL_VAL="$(grep "^AI_MODEL=" "$ENV_FILE" | cut -d= -f2- | tr -d '[:space:]' || true)"
+if [ "${AI_PROVIDER_VAL:-openai}" = "gemini" ]; then
+  if [ -z "$GEMINI_API_KEY_VAL" ] && [ -z "$AI_API_KEY_VAL" ]; then
+    echo "WARNING: AI_PROVIDER=gemini but neither GEMINI_API_KEY nor AI_API_KEY is set in $ENV_FILE."
+    echo "  The AI chat will answer with the offline fallback (or 503) until you set one, e.g.:"
+    echo "    GEMINI_API_KEY=AIza-...  GEMINI_MODEL=gemini-2.5-flash"
+    echo "  Then rebuild + restart:  docker compose -f $COMPOSE_FILE up -d --build backend"
+  fi
+  if [ "$GEMINI_MODEL_VAL" = "gemini-2.0-flash" ] || [ "$AI_MODEL_VAL" = "gemini-2.0-flash" ]; then
+    echo "WARNING: gemini-2.0-flash was shut down on 2026-06-01 and returns 404."
+    echo "  Set GEMINI_MODEL=gemini-2.5-flash (or gemini-3.8-flash) in $ENV_FILE and redeploy."
+  fi
+else
+  if [ -z "$AI_API_KEY_VAL" ]; then
+    echo "WARNING: AI_PROVIDER=${AI_PROVIDER_VAL:-openai} but AI_API_KEY is empty in $ENV_FILE."
+    echo "  The AI chat will run unconfigured (offline fallback / 503) until a key is set."
+  fi
+fi
+
 # --- 2. Start MySQL first (so we can inspect it before booting the API) --------
 echo "Starting MySQL ..."
 docker compose -f "$COMPOSE_FILE" up -d mysql

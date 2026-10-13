@@ -32,9 +32,11 @@ spring:
         api-key: ${GEMINI_API_KEY:${AI_API_KEY:__AI_NOT_CONFIGURED__}}
         chat:
           options:
-            # Supported models include gemini-2.0-flash, gemini-2.0-flash-lite,
-            # gemini-2.5-flash, gemini-2.5-pro. GEMINI_MODEL wins over AI_MODEL.
-            model: ${GEMINI_MODEL:${AI_MODEL:gemini-2.0-flash}}
+            # GA models (verified 2026-10-13): gemini-2.5-flash,
+            # gemini-2.5-flash-lite, gemini-3.5-flash, gemini-3.7-flash,
+            # gemini-3.8-flash. gemini-2.0-flash was shut down 2026-06-01.
+            # GEMINI_MODEL wins over AI_MODEL.
+            model: ${GEMINI_MODEL:${AI_MODEL:gemini-2.5-flash}}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -51,6 +53,11 @@ app:
     rate-limit-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:60}
     # Cron for the nightly expired refresh-token purge.
     refresh-token-cleanup-cron: ${REFRESH_TOKEN_CLEANUP_CRON:0 0 3 * * *}
+  google:
+    # Google Sign-In (Google Identity Services). Create a Web OAuth client at
+    # https://console.cloud.google.com/apis/credentials and set its client ID
+    # as GOOGLE_CLIENT_ID. The backend verifies the ID token audience against it.
+    client-id: ${GOOGLE_CLIENT_ID:}
   ai:
     # Sprint 7 AI Career Assistant (Spring AI chat model, provider configurable).
     # provider: openai | gemini | ollama | custom | disabled (display + preset selection)
@@ -60,8 +67,9 @@ app:
     # answers 503 AI_NOT_CONFIGURED (or offline Smart Guidance when enabled);
     # chat history APIs keep working.
     #   OpenAI:  AI_PROVIDER=openai  AI_API_KEY=sk-...            (defaults work)
-    #   Gemini:  AI_PROVIDER=gemini  GEMINI_API_KEY=AIza-... AI_MODEL=gemini-2.0-flash
-    #            (GEMINI_API_KEY may be omitted when AI_API_KEY holds the Gemini key;
+    #   Gemini:  AI_PROVIDER=gemini  GEMINI_API_KEY=AIza-... AI_MODEL=gemini-2.5-flash
+    #            (or GEMINI_MODEL=gemini-2.5-flash / gemini-3.8-flash;
+    #             GEMINI_API_KEY may be omitted when AI_API_KEY holds the Gemini key;
     #             GEMINI_MODEL optionally overrides AI_MODEL for Gemini)
     #   Ollama:  AI_PROVIDER=ollama  AI_BASE_URL=http://localhost:11434/v1
     #            AI_API_KEY=ollama    AI_MODEL=<pulled-model>
@@ -76,6 +84,10 @@ app:
     history-limit: ${AI_HISTORY_LIMIT:20}
     request-timeout-seconds: ${AI_REQUEST_TIMEOUT_SECONDS:120}
     rate-limit-per-minute: ${AI_RATE_LIMIT_PER_MINUTE:20}
+    # Bounded retries for transient provider errors (429/503/timeouts).
+    # AI_MAX_RETRIES=2 means at most 3 provider calls per chat turn.
+    max-retries: ${AI_MAX_RETRIES:2}
+    retry-backoff-millis: ${AI_RETRY_BACKOFF_MILLIS:800}
     # Always-respond Smart Guidance: true (default) = offline engine answers
     # with zero key AND on provider failure; false = strict 503/502 errors.
     offline-fallback-enabled: ${AI_OFFLINE_FALLBACK:true}

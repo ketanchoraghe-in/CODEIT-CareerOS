@@ -21,8 +21,14 @@ import org.springframework.stereotype.Component;
  *   <li>{@code GEMINI_MODEL}: optional Gemini model override (takes precedence
  *       over {@code AI_MODEL} when {@code AI_PROVIDER=gemini})</li>
  *   <li>{@code AI_MAX_TOOL_ITERATIONS}, {@code AI_HISTORY_LIMIT}: loop/history guards</li>
- *   <li>{@code AI_REQUEST_TIMEOUT_SECONDS}: per-provider-call wall-clock budget</li>
- *   <li>{@code AI_RATE_LIMIT_PER_MINUTE}: max chat turns per student per minute</li>
+     *   <li>{@code AI_REQUEST_TIMEOUT_SECONDS}: per-provider-call wall-clock budget</li>
+     *   <li>{@code AI_RATE_LIMIT_PER_MINUTE}: max chat turns per student per minute</li>
+     *   <li>{@code AI_MAX_RETRIES}: bounded retries for transient provider errors
+     *       (HTTP 429/503/500/502/504, timeouts, overload). Default 2 (up to 3
+     *       attempts total with exponential backoff); clamped to 0-3 so the
+     *       backend can never retry indefinitely.</li>
+     *   <li>{@code AI_RETRY_BACKOFF_MILLIS}: base backoff between retries
+     *       (multiplied by 2^attempt, plus jitter). Default 800ms.</li>
  *   <li>{@code AI_OFFLINE_FALLBACK}: when true (default), the built-in Smart
  *       Guidance engine answers even with no API key or when the provider
  *       fails — the chat NEVER goes silent like a dead chatbot.</li>
@@ -53,6 +59,18 @@ public class AiProperties {
     private int requestTimeoutSeconds = 120;
     /** Max chat turns per student per minute (simple in-memory abuse guard). */
     private int rateLimitPerMinute = 20;
+    /**
+     * Bounded retries for transient provider failures (HTTP 429/503 and other
+     * retryable overload/timeout signals). Counts RETRIES after the first
+     * attempt, so {@code 2} means at most 3 provider calls per chat turn.
+     * Clamped to 0-3 by the service; never indefinite.
+     */
+    private int maxRetries = 2;
+    /**
+     * Base backoff between retries in milliseconds. Actual delay is
+     * {@code base * 2^attempt} plus a small jitter, capped at 10s per sleep.
+     */
+    private long retryBackoffMillis = 800;
     /**
      * Built-in Smart Guidance fallback. True by default so the assistant
      * ALWAYS responds (offline, grounded in CareerOS data) even with no
@@ -89,6 +107,11 @@ public class AiProperties {
     /**
      * Model for the active provider: {@code GEMINI_MODEL} first, then
      * {@code AI_MODEL}, then the per-provider default.
+     *
+     * <p>Default is {@code gemini-2.5-flash}: {@code gemini-2.0-flash} was shut
+     * down on 2026-06-01 and returns 404, while {@code gemini-2.5-flash} is GA
+     * and proven locally. Newer GA models such as {@code gemini-3.5-flash} and
+     * {@code gemini-3.8-flash} are also supported when set explicitly.
      */
     public String effectiveModel() {
         if (isGemini()) {
@@ -98,7 +121,7 @@ public class AiProperties {
             if (model != null && !model.isBlank() && !isOpenAiDefaultModelOnly()) {
                 return model.strip();
             }
-            return "gemini-2.0-flash";
+            return "gemini-2.5-flash";
         }
         return model;
     }

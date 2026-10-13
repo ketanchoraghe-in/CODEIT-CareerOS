@@ -58,5 +58,16 @@ public class AiProviderConsistencyCheck {
                     aiProperties.getProvider(), aiProperties.effectiveModel(),
                     active.getClass().getSimpleName());
         }
+        if (aiProperties.isGemini()) {
+            String model = String.valueOf(aiProperties.effectiveModel());
+            // gemini-2.0-flash was shut down 2026-06-01 (HTTP 404 on every
+            // call); warn instead of failing silently with offline fallback.
+            if (model.contains("2.0-flash")) {
+                log.error("AI provider misconfigured: model {} is discontinued (shut down 2026-06-01). "
+                                + "Set GEMINI_MODEL to a supported model such as gemini-2.5-flash or "
+                                + "gemini-3.8-flash.",
+                        model);
+            }
+        }
     }
 }

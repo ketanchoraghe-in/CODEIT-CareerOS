@@ -39,7 +39,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
+        "app.ai.provider=openai",
         "app.ai.api-key=",
+        "app.ai.gemini-api-key=",
         "app.ai.offline-fallback-enabled=true"
 })
 class AiChatOfflineFallbackTest {
