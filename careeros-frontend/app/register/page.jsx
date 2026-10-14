@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, BadgeCheck, Check, Eye, EyeOff, Loader2, LockKeyhole, Mail, Phone, ShieldCheck, User, Zap } from "lucide-react";
+import { AlertCircle, ArrowRight, BadgeCheck, Check, Eye, EyeOff, Loader2, LockKeyhole, Mail, Phone, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -130,7 +130,6 @@ export default function RegisterPage() {
     <AuthSplit
       eyebrow="Free student account"
       title="Create your account"
-      description="Join thousands of students turning skills into offers — assess, close gaps, and prove you're industry-ready."
       footer={
         <p className="text-sm text-muted-foreground">
           Already have an account?{" "}
@@ -228,11 +227,6 @@ export default function RegisterPage() {
           <Button type="submit" size="lg" disabled={loading} className="btn-polish h-12 w-full rounded-xl bg-gradient-to-r from-brand-800 via-brand-700 to-brand-600 text-[15px] font-semibold text-white shadow-lg shadow-brand-900/20 hover:from-brand-700 hover:via-brand-600 hover:to-brand-500 hover:shadow-xl hover:shadow-brand-900/25 disabled:opacity-70 disabled:shadow-none">
             {loading ? (<><Loader2 className="size-4 animate-spin" aria-hidden="true" />Creating your account…</>) : (<>Create free account<ArrowRight className="size-4 transition-transform group-hover/button:translate-x-0.5" aria-hidden="true" /></>)}
           </Button>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11px] font-medium text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-3.5 text-brand-600" aria-hidden="true" />Secure & private</span>
-            <span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 text-chart-2" aria-hidden="true" />Free to start</span>
-            <span className="inline-flex items-center gap-1.5"><BadgeCheck className="size-3.5 text-brand-600" aria-hidden="true" />No credit card</span>
-          </div>
         </div>
 
         <GoogleSignInButton mode="signup" onError={setError} />

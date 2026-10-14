@@ -52,4 +52,6 @@ echo [INFO] Using Java: %JAVA_BIN%
 "%JAVA_BIN%" -version 2>&1 | findstr version
 echo [INFO] Starting backend with profile 'dev' ...
 echo [INFO] Open: http://localhost:8080/swagger-ui.html  (Ctrl+C to stop)
+REM --- Google Sign-In (public Client ID, safe to commit) ---
+if not defined GOOGLE_CLIENT_ID set "GOOGLE_CLIENT_ID=77849822296-afqnenl0hs9rhdokenbin2k68sfhi3cg.apps.googleusercontent.com"
 "%JAVA_BIN%" -jar "%JAR%" --spring.profiles.active=dev
