@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, BadgeCheck, Check, Eye, EyeOff, Loader2, LockKeyhole, Mail, Phone, User } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AlertCircle, ArrowRight, BadgeCheck, Check, Eye, EyeOff, Loader2, LockKeyhole, LogIn, Mail, Phone, User, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -40,14 +40,18 @@ const inputShell = (hasError) =>
 const MOBILE_PATTERN = /^[6-9][0-9]{9}$/;
 const MOBILE_ERROR = "Enter a valid 10-digit mobile number starting with 6, 7, 8 or 9";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState({ fullName: "", email: "", mobile: "", password: "" });
   const [agreed, setAgreed] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [existingUser, setExistingUser] = useState(null);
+  const [switching, setSwitching] = useState(false);
 
   const score = passwordScore(form.password);
 
@@ -87,6 +91,70 @@ export default function RegisterPage() {
     }
   }
 
+  // Same guard as /login: never silently jump a signed-in visitor into
+  // a dashboard from "Create account". Show an explicit choice instead.
+  useEffect(() => {
+    async function checkExistingSession() {
+      const forceForm =
+        searchParams.get("switch") === "1" ||
+        searchParams.get("force") === "1" ||
+        searchParams.get("logout") === "1";
+      if (forceForm) {
+        auth.clear();
+        setExistingUser(null);
+        setCheckingSession(false);
+        return;
+      }
+      if (auth.isAuthenticated()) {
+        setExistingUser(auth.getUser());
+        setCheckingSession(false);
+        return;
+      }
+      const refreshToken = auth.getRefreshToken();
+      const staleAccess = auth.getAccessToken();
+      if (refreshToken && staleAccess) {
+        try {
+          const data = await api.post("/auth/refresh", { refreshToken });
+          auth.save({
+            accessToken: data.accessToken,
+            refreshToken: data.refreshToken,
+            user: data.user,
+          });
+          setExistingUser(data.user || auth.getUser());
+          setCheckingSession(false);
+          return;
+        } catch {
+          auth.clear();
+        }
+      } else if (staleAccess && !refreshToken) {
+        auth.clear();
+      }
+      setCheckingSession(false);
+    }
+    checkExistingSession();
+  }, [searchParams]);
+
+  function dashboardFor(user) {
+    return user?.role === "ADMIN" ? "/admin/dashboard" : "/student/dashboard";
+  }
+
+  async function handleSwitchAccount() {
+    setSwitching(true);
+    try {
+      const refreshToken = auth.getRefreshToken();
+      if (refreshToken) {
+        await api.post("/auth/logout", { refreshToken }).catch(() => null);
+      }
+    } finally {
+      auth.clear();
+      setExistingUser(null);
+      setForm({ fullName: "", email: "", mobile: "", password: "" });
+      setAgreed(false);
+      setError("");
+      setSwitching(false);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
@@ -94,8 +162,7 @@ export default function RegisterPage() {
     if (Object.keys(errors).length) {
       setFieldErrors(errors);
       return;
-    }
-    setFieldErrors({});
+    }    setFieldErrors({});
     setLoading(true);
     try {
       const data = await api.post("/auth/register", {
@@ -129,16 +196,62 @@ export default function RegisterPage() {
   return (
     <AuthSplit
       eyebrow="Free student account"
-      title="Create your account"
+      title={existingUser ? "You're already signed in" : "Create your account"}
+      description={
+        existingUser
+          ? `Signed in as ${existingUser.fullName || existingUser.email || "your account"}. You can't create a new account while signed in — continue to your dashboard or switch accounts.`
+          : undefined
+      }
       footer={
-        <p className="text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-brand-700 underline-offset-4 hover:underline dark:text-brand-300">
-            Sign in
-          </Link>
-        </p>
+        existingUser ? null : (
+          <p className="text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link href="/login" className="font-semibold text-brand-700 underline-offset-4 hover:underline dark:text-brand-300">
+              Sign in
+            </Link>
+          </p>
+        )
       }
     >
+      {checkingSession ? (
+        <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground" role="status">
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          Checking your session…
+        </div>
+      ) : existingUser ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-muted/40 p-4">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <UserRound className="size-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold">{existingUser.fullName || "CareerOS user"}</p>
+              <p className="truncate text-xs text-muted-foreground">{existingUser.email}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-brand-600/10 px-2.5 py-1 text-[11px] font-bold text-brand-700">
+              {existingUser.role || "STUDENT"}
+            </span>
+          </div>
+          <Button
+            size="lg"
+            className="btn-polish h-12 w-full rounded-xl bg-gradient-to-r from-brand-800 via-brand-700 to-brand-600 text-[15px] font-semibold text-white"
+            onClick={() => router.replace(dashboardFor(existingUser))}
+          >
+            <LogIn className="size-4" aria-hidden="true" />
+            Continue to dashboard
+          </Button>
+          <Button type="button" variant="outline" size="lg" className="h-12 w-full rounded-xl" disabled={switching} onClick={handleSwitchAccount}>
+            {switching ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                Signing out…
+              </>
+            ) : (
+              "Use another account"
+            )}
+          </Button>
+        </div>
+      ) : (
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         {error && (
           <Alert variant="destructive" className="anim-hero-rise rounded-xl border-destructive/30 bg-destructive/[0.06] px-3.5 py-3" style={{ "--d": "0.05s" }}>
@@ -238,6 +351,24 @@ export default function RegisterPage() {
           </Link>
         </p>
       </form>
+      )}
     </AuthSplit>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthSplit eyebrow="Free student account" title="Create your account">
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground" role="status">
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            Loading…
+          </div>
+        </AuthSplit>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }

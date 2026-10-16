@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Menu, Sparkles, X } from "lucide-react";
+import { ArrowRight, LayoutDashboard, Menu, Sparkles, X } from "lucide-react";
 import { LogoWordmark } from "@/components/logo";
+import { auth } from "@/lib/auth";
 import { cn } from "cn";
 
 const navLinks = [
@@ -15,6 +16,7 @@ function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [bannerVisible, setBannerVisible] = useState(true);
+  const [dashboardHref, setDashboardHref] = useState(null);
 
   useEffect(() => {
     function onScroll() {
@@ -23,6 +25,27 @@ function Navbar() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Auth-aware CTA: a signed-in visitor must see "Go to dashboard",
+  // never "Sign in" (which used to look like it auto-logged them in
+  // when the middleware redirected to the dashboard).
+  useEffect(() => {
+    function syncAuth() {
+      if (auth.isAuthenticated()) {
+        const role = auth.getRole();
+        setDashboardHref(role === "ADMIN" ? "/admin/dashboard" : "/student/dashboard");
+      } else {
+        setDashboardHref(null);
+      }
+    }
+    syncAuth();
+    window.addEventListener("storage", syncAuth);
+    window.addEventListener("careeros:auth-changed", syncAuth);
+    return () => {
+      window.removeEventListener("storage", syncAuth);
+      window.removeEventListener("careeros:auth-changed", syncAuth);
+    };
   }, []);
 
   return (
@@ -90,26 +113,42 @@ function Navbar() {
           </div>
 
           <div className="hidden items-center gap-1.5 sm:flex">
-            <Link
-              href="/login"
-              className="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-brand-600/10 hover:text-brand-700"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="group/cta relative inline-flex items-center gap-1.5 overflow-hidden rounded-full bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/25 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-brand-600/40 hover:brightness-110 active:translate-y-px active:scale-[0.97]"
-            >
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover/cta:translate-x-full"
-              />
-              Get Started
-              <ArrowRight
-                className="size-4 transition-transform duration-300 group-hover/cta:translate-x-0.5"
-                aria-hidden="true"
-              />
-            </Link>
+            {dashboardHref ? (
+              <Link
+                href={dashboardHref}
+                className="group/cta relative inline-flex items-center gap-1.5 overflow-hidden rounded-full bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/25 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-brand-600/40 hover:brightness-110 active:translate-y-px active:scale-[0.97]"
+              >
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover/cta:translate-x-full"
+                />
+                <LayoutDashboard className="size-4" aria-hidden="true" />
+                Go to dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition hover:bg-brand-600/10 hover:text-brand-700"
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/register"
+                  className="group/cta relative inline-flex items-center gap-1.5 overflow-hidden rounded-full bg-gradient-to-r from-brand-700 via-brand-600 to-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-600/25 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl hover:shadow-brand-600/40 hover:brightness-110 active:translate-y-px active:scale-[0.97]"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover/cta:translate-x-full"
+                  />
+                  Get Started
+                  <ArrowRight
+                    className="size-4 transition-transform duration-300 group-hover/cta:translate-x-0.5"
+                    aria-hidden="true"
+                  />
+                </Link>
+              </>
+            )}
           </div>
 
           <button
@@ -141,20 +180,33 @@ function Navbar() {
                 </Link>
               ))}
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <Link
-                  href="/login"
-                  onClick={() => setMenuOpen(false)}
-                  className="inline-flex h-10 items-center justify-center rounded-full border border-border text-sm font-semibold transition hover:bg-accent"
-                >
-                  Sign in
-                </Link>
-                <Link
-                  href="/register"
-                  onClick={() => setMenuOpen(false)}
-                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-brand-700 to-brand-500 text-sm font-semibold text-white shadow-md shadow-brand-600/25"
-                >
-                  Get Started
-                </Link>
+                {dashboardHref ? (
+                  <Link
+                    href={dashboardHref}
+                    onClick={() => setMenuOpen(false)}
+                    className="col-span-2 inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-brand-700 to-brand-500 text-sm font-semibold text-white shadow-md shadow-brand-600/25"
+                  >
+                    <LayoutDashboard className="size-4" aria-hidden="true" />
+                    Go to dashboard
+                  </Link>
+                ) : (
+                  <>
+                    <Link
+                      href="/login"
+                      onClick={() => setMenuOpen(false)}
+                      className="inline-flex h-10 items-center justify-center rounded-full border border-border text-sm font-semibold transition hover:bg-accent"
+                    >
+                      Sign in
+                    </Link>
+                    <Link
+                      href="/register"
+                      onClick={() => setMenuOpen(false)}
+                      className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-brand-700 to-brand-500 text-sm font-semibold text-white shadow-md shadow-brand-600/25"
+                    >
+                      Get Started
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>

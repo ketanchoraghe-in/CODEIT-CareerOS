@@ -19,6 +19,16 @@ function decodeJwt(token) {
   }
 }
 
+function isTokenExpired(token) {
+  if (!token) return true;
+  const payload = decodeJwt(token);
+  if (!payload) return true;
+  if (typeof payload.exp !== "number") return false;
+  // `exp` is seconds since epoch. Add a small clock-skew buffer.
+  const nowSec = Math.floor(Date.now() / 1000);
+  return payload.exp <= nowSec + 10;
+}
+
 function cookieSecureFlag() {
   if (typeof window !== "undefined" && window.location?.protocol === "https:") return "; Secure";
   return "";
@@ -32,6 +42,12 @@ function clearCookie(name) {
   document.cookie = `${name}=; path=/; SameSite=Lax; expires=Thu, 01 Jan 1970 00:00:00 GMT${cookieSecureFlag()}`;
 }
 
+function notifyAuthChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("careeros:auth-changed"));
+  }
+}
+
 export const auth = {
   save({ accessToken, refreshToken, user }) {
     if (typeof window === "undefined") return;
@@ -39,6 +55,7 @@ export const auth = {
     if (refreshToken) localStorage.setItem(REFRESH_KEY, refreshToken);
     if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
     setCookie(COOKIE_NAME, accessToken);
+    notifyAuthChanged();
   },
 
   getAccessToken() {
@@ -63,22 +80,43 @@ export const auth = {
   },
 
   getRole() {
-    const user = this.getUser();
-    if (user?.role) return user.role;
     const token = this.getAccessToken();
-    return decodeJwt(token)?.role ?? null;
+    if (token && !isTokenExpired(token)) {
+      // Prefer the live token claim; it reflects the current session.
+      // Falls back to the cached user only when the token has no role.
+      const tokenRole = decodeJwt(token)?.role;
+      if (tokenRole) return tokenRole;
+    }
+    // If the access token is expired/missing, do NOT trust the cached
+    // user — the session may no longer be valid. Callers must refresh
+    // or re-authenticate first.
+    if (token && !isTokenExpired(token)) {
+      const user = this.getUser();
+      if (user?.role) return user.role;
+    }
+    return null;
   },
 
   isAuthenticated() {
-    return Boolean(this.getAccessToken());
+    const token = this.getAccessToken();
+    return Boolean(token) && !isTokenExpired(token);
   },
 
   clear() {
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
-    localStorage.removeItem(USER_KEY);
-    clearCookie(COOKIE_NAME);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(ACCESS_KEY);
+      localStorage.removeItem(REFRESH_KEY);
+      localStorage.removeItem(USER_KEY);
+      clearCookie(COOKIE_NAME);
+      notifyAuthChanged();
+      return;
+    }
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem(ACCESS_KEY);
+      localStorage.removeItem(REFRESH_KEY);
+      localStorage.removeItem(USER_KEY);
+    }
   },
 };
 
-export { decodeJwt, COOKIE_NAME };
+export { decodeJwt, isTokenExpired, COOKIE_NAME };
