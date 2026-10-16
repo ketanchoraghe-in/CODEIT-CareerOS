@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +21,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Map;
+
 @Tag(name = "Authentication", description = "Register, login, refresh and logout endpoints")
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -27,6 +30,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+
+    @Value("${app.google.client-id:}")
+    private String googleClientId;
 
     @Operation(summary = "Register a new student account")
     @PostMapping("/register")
@@ -69,5 +75,17 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<UserResponse> me() {
         return ApiResponse.success(authService.me());
+    }
+
+    @Operation(summary = "Public auth configuration (Google Client ID for the sign-in button)",
+            description = "Public, unauthenticated. Returns the Google OAuth client ID so the "
+                    + "frontend can render the Google button even when the build-time "
+                    + "NEXT_PUBLIC_GOOGLE_CLIENT_ID was empty. The client ID is public by design.")
+    @GetMapping("/config")
+    public ApiResponse<Map<String, Object>> config() {
+        String trimmed = googleClientId == null ? "" : googleClientId.trim();
+        return ApiResponse.success(Map.of(
+                "googleClientId", trimmed,
+                "googleConfigured", !trimmed.isEmpty()));
     }
 }

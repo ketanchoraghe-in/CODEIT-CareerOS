@@ -67,6 +67,7 @@ api.interceptors.response.use(
       original?.url?.includes("/auth/login") ||
       original?.url?.includes("/auth/register") ||
       original?.url?.includes("/auth/google") ||
+      original?.url?.includes("/auth/config") ||
       original?.url?.includes("/auth/refresh");
 
     if (error.response?.status === 401 && !isAuthCall && !original?._retry && typeof window !== "undefined") {

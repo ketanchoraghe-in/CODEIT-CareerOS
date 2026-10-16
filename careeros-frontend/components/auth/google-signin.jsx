@@ -46,7 +46,33 @@ export function GoogleSignInButton({ mode = "signin", onError }) {
   const btnRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [blocked, setBlocked] = useState("");
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  const buildTimeId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  const [runtimeId, setRuntimeId] = useState("");
+  const [configChecked, setConfigChecked] = useState(Boolean(buildTimeId));
+
+  // Runtime fallback: the live frontend may have been built before
+  // GOOGLE_CLIENT_ID was set in backend.env (NEXT_PUBLIC_* is baked at
+  // build time). In that case ask the backend — GET /auth/config is public
+  // and returns the same ID — so the button appears without a rebuild.
+  useEffect(() => {
+    if (buildTimeId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const cfg = await api.get("/auth/config");
+        if (!cancelled && cfg?.googleClientId) setRuntimeId(cfg.googleClientId);
+      } catch {
+        // Email/password still works; keep the Google button hidden.
+      } finally {
+        if (!cancelled) setConfigChecked(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [buildTimeId]);
+
+  const clientId = buildTimeId || runtimeId;
 
   const handleCredential = useCallback(
     async (response) => {
@@ -103,6 +129,7 @@ export function GoogleSignInButton({ mode = "signin", onError }) {
     };
   }, [clientId, mode, handleCredential]);
 
+  if (!configChecked) return null;
   if (!clientId) return null;
 
   return (

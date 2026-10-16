@@ -173,6 +173,19 @@ set -a; . "./$ENV_FILE"; set +a
 # leak into the frontend build through the exported environment.
 export FRONTEND_API_URL=""
 export API_PROXY_URL="http://backend:8080"
+# Google Sign-In: NEXT_PUBLIC_GOOGLE_CLIENT_ID is baked into the frontend at
+# BUILD time (docker-compose.prod.yml maps GOOGLE_CLIENT_ID -> build-arg).
+# Sourcing backend.env above exports it, but make it explicit + visible so a
+# missing ID is caught here instead of "button not showing" on the live site.
+if [ -n "${GOOGLE_CLIENT_ID:-}" ]; then
+  export GOOGLE_CLIENT_ID
+  echo "Google Sign-In: GOOGLE_CLIENT_ID is set — frontend build will include the Google button."
+else
+  echo "Google Sign-In: GOOGLE_CLIENT_ID is empty — frontend will build WITHOUT the Google button (email/password only)."
+  echo "  To enable: set GOOGLE_CLIENT_ID=<id>.apps.googleusercontent.com in $ENV_FILE,"
+  echo "  add the live origin ($FRONTEND_ORIGIN) in Google Cloud Console > Credentials > Authorized JavaScript origins,"
+  echo "  then rebuild: docker compose -f $COMPOSE_FILE up -d --build frontend"
+fi
 
 TABLE_COUNT="$(docker compose -f "$COMPOSE_FILE" exec -T mysql \
   mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -N -e \
@@ -240,6 +253,11 @@ echo
 echo "================ DEPLOY COMPLETE ================"
 echo "Open the app : $FRONTEND_ORIGIN"
 echo "API (proxied): $FRONTEND_ORIGIN/api/v1/... (same origin, no mixed content)"
+if [ -n "${GOOGLE_CLIENT_ID:-}" ]; then
+  echo "Google button: enabled (GOOGLE_CLIENT_ID set; also served at runtime via /api/v1/auth/config)."
+else
+  echo "Google button: DISABLED (GOOGLE_CLIENT_ID empty in $ENV_FILE)."
+fi
 if [ "$FIRST_RUN" = true ]; then
   # shellcheck disable=SC1090
   set -a; . "./$ENV_FILE"; set +a
